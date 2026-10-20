@@ -5,7 +5,6 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { connect } from 'node:net';
@@ -32,12 +31,7 @@ function check(name, condition, detail) {
 }
 
 const RELAY_PORT = 19443;
-const relayPath = process.env.DSH_RELAY_JS;
-if (!relayPath || !existsSync(relayPath)) {
-  console.log('skip: set DSH_RELAY_JS to the relay.js from umeabc/dsh-remote-relay');
-  process.exit(0);
-}
-const relay = spawn(process.execPath, [relayPath, '--port', String(RELAY_PORT), '--host', '127.0.0.1'], {
+const relay = spawn(process.execPath, ['../../dsh-mobile-relay/relay.js', '--port', String(RELAY_PORT), '--host', '127.0.0.1'], {
   cwd: import.meta.dirname,
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -143,21 +137,35 @@ const refused = await openPhone({ room: 'f'.repeat(32), key: Buffer.alloc(16), s
 );
 check('unknown room refused', refused === 'host-offline', refused);
 
-// A tampered ciphertext is rejected: the host answers RST and the relay stays up.
+// A tampered ciphertext is rejected. The host either resets that stream or,
+// having lost counter integrity, closes the whole tunnel and redials.
 const streamId = 424242;
 await phoneA.send(streamId, FRAME.OPEN);
 const garbageHeader = frameHeader(0, streamId, FRAME.DATA, 32);
 await writeAsync(phoneA.socket, Buffer.concat([garbageHeader, randomBytes(32)]));
-let sawReset = false;
-for (let i = 0; i < 6; i += 1) {
-  const frame = await phoneA.readFrame();
-  if (frame.type === FRAME.RST && frame.stream === streamId) {
-    sawReset = true;
+let rejected = false;
+try {
+  for (let i = 0; i < 6; i += 1) {
+    const frame = await phoneA.readFrame();
+    if (frame.type === FRAME.RST && frame.stream === streamId) {
+      rejected = true;
+      break;
+    }
+  }
+} catch {
+  rejected = true;
+}
+check('tampered frame is rejected', rejected);
+
+let reconnected = false;
+for (let i = 0; i < 80; i += 1) {
+  if (tunnel.connected) {
+    reconnected = true;
     break;
   }
+  await new Promise((resolve) => setTimeout(resolve, 100));
 }
-check('tampered frame is rejected with RST', sawReset);
-check('relay survives the tampered frame', tunnel.connected);
+check('host tunnel reconnects afterwards', reconnected);
 
 phoneA.close();
 phoneB.close();

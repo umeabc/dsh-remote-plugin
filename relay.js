@@ -24,6 +24,15 @@ import {
   writeAsync,
 } from './core.js';
 
+/** Destroy a socket without letting a teardown error escape. */
+function closeQuietly(socket) {
+  try {
+    socket?.destroy();
+  } catch {
+    /* already gone */
+  }
+}
+
 function parseRelayUrl(value) {
   if (typeof value !== 'string' || value.trim() === '') return null;
   const trimmed = value.trim().replace(/^tcp:\/\//i, '');
@@ -217,7 +226,7 @@ export class RelayTunnel {
         } catch (error) {
           warn('relay: channel authentication failed, reconnecting:', error.message);
           this.closeChannel(channel);
-          runCatchingClose(this.socket);
+          closeQuietly(this.socket);
           continue;
         }
         const socket = state.streams.get(stream);
