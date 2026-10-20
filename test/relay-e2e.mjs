@@ -5,6 +5,8 @@
  */
 
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { createServer as createNetServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { connect } from 'node:net';
@@ -30,14 +32,33 @@ function check(name, condition, detail) {
   console.log(`${condition ? 'PASS' : 'FAIL'}  ${name}${detail ? ` - ${detail}` : ''}`);
 }
 
-const RELAY_PORT = 19443;
-const relay = spawn(process.execPath, ['../../dsh-mobile-relay/relay.js', '--port', String(RELAY_PORT), '--host', '127.0.0.1'], {
+const RELAY_PORT = await new Promise((resolve) => {
+  const probe = createNetServer();
+  probe.listen(0, '127.0.0.1', () => {
+    const chosen = probe.address().port;
+    probe.close(() => resolve(chosen));
+  });
+});
+const relayPath = process.env.DSH_RELAY_JS ?? '../../dsh-mobile-relay/relay.js';
+if (!existsSync(relayPath)) {
+  console.log('skip: set DSH_RELAY_JS to the relay.js from umeabc/dsh-remote-relay');
+  process.exit(0);
+}
+const relay = spawn(process.execPath, [relayPath, '--port', String(RELAY_PORT), '--host', '127.0.0.1'], {
   cwd: import.meta.dirname,
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 relay.stdout.on('data', (chunk) => process.stdout.write(`  relay| ${chunk}`));
 relay.stderr.on('data', (chunk) => process.stderr.write(`  relay! ${chunk}`));
-await new Promise((resolve) => setTimeout(resolve, 400));
+await new Promise((resolve) => {
+  const timer = setTimeout(resolve, 5000);
+  relay.stdout.on('data', (chunk) => {
+    if (chunk.toString().includes('listening on')) {
+      clearTimeout(timer);
+      resolve();
+    }
+  });
+});
 
 const upstreamServer = createServer((request, response) => {
   response.writeHead(200, { 'content-type': 'text/plain' });
