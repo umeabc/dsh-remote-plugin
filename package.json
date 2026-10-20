@@ -1,0 +1,43 @@
+{
+  "name": "dsh-mobile-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Open this DeepSeek Harness desktop from a phone: LAN pairing or an AES-128-GCM relay tunnel.",
+  "icon": "./icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "core.js",
+    "lan.js",
+    "relay.js",
+    "qr.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "assets/*"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/umeabc/dsh-remote-plugin.git"
+  },
+  "license": "MIT"
+}

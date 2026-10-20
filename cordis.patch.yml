@@ -1,0 +1,13 @@
+# dsh-mobile-bridge: phone access to this desktop.
+# `lan` serves the DSH UI on the local network after a six-digit pairing.
+# `relay` keeps an encrypted outbound tunnel to a relay server (see dsh-mobile-relay).
+- insert:
+    - id: mobile-bridge
+      name: dsh-mobile-bridge
+      config:
+        lan:
+          enabled: true
+          host: 0.0.0.0
+          port: 8320
+        relay:
+          url: ''
