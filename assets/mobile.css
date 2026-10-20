@@ -167,3 +167,11 @@ html[data-dshm-mobile='1'] [data-slot='conversation.header'] {
     padding-inline: 12px;
   }
 }
+
+/* Full-bleed WebView: the page paints behind the navigation bar, so its
+   sticky bottom block (composer + token dock) must clear the system
+   buttons. The app publishes the inset as --dshm-safe-bottom (CSS px);
+   browsers fall back to env(). */
+html[data-dshm-mobile='1'] [class*='composerSeat'] {
+  bottom: max(var(--dshm-safe-bottom, 0px), env(safe-area-inset-bottom, 0px)) !important;
+}

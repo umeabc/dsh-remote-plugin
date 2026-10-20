@@ -214,12 +214,18 @@ const PWA_HEAD = [
   '<link rel="manifest" href="/__mobile/manifest.webmanifest">',
   '<link rel="stylesheet" href="/__mobile/mobile.css">',
   '<script src="/__mobile/mobile.js" defer></script>',
-  '<style>:root{--dsh-mobile-safe-top:env(safe-area-inset-top,0px);--dsh-mobile-safe-bottom:env(safe-area-inset-bottom,0px)}body{padding-bottom:var(--dsh-mobile-safe-bottom)}</style>',
+  '<style>:root{--dsh-mobile-safe-top:env(safe-area-inset-top,0px);--dsh-mobile-safe-bottom:env(safe-area-inset-bottom,0px);--dshm-safe-bottom:0px}body{padding-bottom:max(var(--dshm-safe-bottom),var(--dsh-mobile-safe-bottom))}</style>',
 ].join('');
 
 /** Replace the shell's own manifest link with the bridge manifest and add app meta. */
 export function injectIndex(html) {
-  const stripped = html.replace(/<link[^>]+rel=["']manifest["'][^>]*>/i, '');
+  let stripped = html.replace(/<link[^>]+rel=["']manifest["'][^>]*>/i, '');
+  // The first viewport meta wins, so extend the page's own one in place
+  // (adding a second would be ignored by browsers).
+  stripped = stripped.replace(
+    /<meta([^>]+name=["']viewport["'][^>]*)>/i,
+    (match, attrs) => (/viewport-fit=cover/i.test(attrs) ? match : `<meta${attrs},viewport-fit=cover>`),
+  );
   if (/<\/head>/i.test(stripped)) return stripped.replace(/<\/head>/i, `${PWA_HEAD}</head>`);
   return `${PWA_HEAD}${stripped}`;
 }
