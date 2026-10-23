@@ -23,6 +23,7 @@ import {
 } from './core.js';
 import { LanBridge } from './lan.js';
 import { RelayTunnel } from './relay.js';
+import { DirectServer, directCandidates } from './direct.js';
 import { qrSvg } from './qr.js';
 
 export const name = 'dsh-mobile-bridge';
@@ -33,6 +34,7 @@ const VERSION = '0.1.0';
 const DEFAULTS = {
   lan: { enabled: true, host: '0.0.0.0', port: 8320, publicHost: '', sessionDays: 30 },
   relay: { enabled: true, url: '' },
+  direct: { enabled: true, port: 8330, publicHost: '' },
 };
 
 function mergeConfig(config) {
@@ -40,6 +42,7 @@ function mergeConfig(config) {
   return {
     lan: { ...DEFAULTS.lan, ...(raw.lan ?? {}) },
     relay: { ...DEFAULTS.relay, ...(raw.relay ?? {}) },
+    direct: { ...DEFAULTS.direct, ...(raw.direct ?? {}) },
   };
 }
 
@@ -71,11 +74,13 @@ export async function apply(ctx, config) {
   const upstream = new Upstream(ctx);
   let lan = null;
   let relay = null;
+  let direct = null;
 
   const status = () => ({
     version: VERSION,
     lan: lan?.status() ?? { enabled: settings.lan.enabled !== false, running: false },
     relay: relay?.status() ?? { enabled: false, connected: false },
+    direct: direct?.status() ?? { enabled: false, port: 0, active: 0 },
   });
 
   const authorized = (request) => {
@@ -108,6 +113,15 @@ export async function apply(ctx, config) {
 
   route('exact', '/__mobile/mobile.css', asset('mobile.css', 'text/css; charset=utf-8'));
   route('exact', '/__mobile/mobile.js', asset('mobile.js', 'text/javascript; charset=utf-8'));
+
+  route('exact', '/__mobile/direct.json', (request, response) => {
+    if (!authorized(request)) return sendText(response, 401, 'unauthorized');
+    sendJson(response, 200, {
+      enabled: direct !== null && direct.port > 0,
+      port: direct?.port ?? 0,
+      candidates: direct === null ? [] : directCandidates(settings.direct),
+    });
+  });
 
   route('exact', '/__mobile/status', (request, response) => {
     if (!authorized(request)) {
@@ -199,6 +213,7 @@ export async function apply(ctx, config) {
   const shutdown = async () => {
     if (stopping) return;
     stopping = true;
+    await direct?.stop().catch(() => {});
     await relay?.stop().catch(() => {});
     await lan?.stop().catch(() => {});
     await upstream.stop().catch(() => {});
@@ -224,6 +239,20 @@ export async function apply(ctx, config) {
     relay = new RelayTunnel({ store, upstream, config: settings.relay });
     if (relay.enabled) relay.start();
     else if (settings.relay.enabled !== false) log('relay: no address configured, tunnel idle');
+    relay.directInfo = () => (direct === null
+      ? null
+      : {
+          enabled: direct.port > 0,
+          port: direct.port,
+          candidates: directCandidates(settings.direct),
+        });
+    if (settings.direct.enabled !== false && relay.enabled) {
+      direct = new DirectServer({ tunnel: relay, config: settings.direct });
+      await direct.start().catch((error) => {
+        direct = null;
+        warn(`direct: listener unavailable: ${error.message}`);
+      });
+    }
   } catch (error) {
     warn(`mobile bridge failed to start: ${error.message}`);
   }

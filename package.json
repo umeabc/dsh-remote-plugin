@@ -16,6 +16,7 @@
     "core.js",
     "lan.js",
     "relay.js",
+    "direct.js",
     "qr.js",
     "client.js",
     "cordis.patch.yml",
@@ -34,10 +35,5 @@
         "@deepseek-ai/dsh-client-ui-settings"
       ]
     }
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/umeabc/dsh-remote-plugin.git"
-  },
-  "license": "MIT"
+  }
 }

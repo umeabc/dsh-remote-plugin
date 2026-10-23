@@ -19,6 +19,7 @@ export const FRAME = {
   RST: 4,
   PING: 5,
   CHANNEL_CLOSED: 6,
+  DIRECT: 7,
 };
 
 export const MAX_CHUNK = 16 * 1024;

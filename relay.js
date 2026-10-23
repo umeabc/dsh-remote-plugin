@@ -54,6 +54,8 @@ export class RelayTunnel {
     this.stopped = true;
     this.lastError = null;
     this.channels = new Map();
+    this.channelSockets = new Map();
+    this.directSeq = 200;
     this.loop = null;
     this.lastRxAt = 0;
     this.backoff = 3000;
@@ -201,10 +203,12 @@ export class RelayTunnel {
     }
   }
 
-  async readFrames(reader) {
+  async readFrames(reader, bindChannel) {
     for (;;) {
       const header = await reader.read(8);
       this.lastRxAt = Date.now();
+      // A direct client always writes channel 0; bind it to its own channel.
+      if (bindChannel !== undefined) header[0] = bindChannel;
       const channel = header[0];
       const stream = header.readUInt32BE(1);
       const type = header[5];
@@ -213,6 +217,10 @@ export class RelayTunnel {
 
       if (type === FRAME.HELLO) {
         this.openChannel(channel, payload);
+        const info = this.directInfo?.();
+        if (info !== undefined && info !== null) {
+          void this.send(channel, 0, FRAME.DIRECT, Buffer.from(JSON.stringify(info), 'utf8'));
+        }
         continue;
       }
       if (type === FRAME.CHANNEL_CLOSED) {
@@ -276,6 +284,34 @@ export class RelayTunnel {
     }
   }
 
+  /** Accept a client that reached us without the relay (LAN or IPv6). */
+  async attachDirect(socket, room) {
+    socket.setNoDelay(true);
+    socket.setKeepAlive(true, 30000);
+    const reader = new ByteReader(socket[Symbol.asyncIterator]());
+    const length = (await reader.read(4)).readUInt32BE(0);
+    if (length === 0 || length > 4096) throw new Error('bad direct handshake');
+    const hello = JSON.parse((await reader.read(length)).toString('utf8'));
+    if (hello?.v !== 1 || hello.role !== 'client') throw new Error('bad direct hello');
+    if (hello.room !== room) throw new Error('direct room mismatch');
+    const salt = Buffer.from(String(hello.salt ?? ''), 'base64');
+    if (salt.length !== 16) throw new Error('bad direct salt');
+
+    this.directSeq = this.directSeq >= 250 ? 200 : this.directSeq + 1;
+    const channel = this.directSeq;
+    this.openChannel(channel, salt);
+    this.channelSockets.set(channel, socket);
+    await writeAsync(socket, handshakeMessage({ ok: true, channel }));
+    log(`direct: client attached channel=${channel}`);
+    try {
+      await this.readFrames(reader, channel);
+    } finally {
+      this.channelSockets.delete(channel);
+      this.closeChannel(channel);
+      socket.destroy();
+    }
+  }
+
   openChannel(channel, salt) {
     const master = this.key;
     this.channels.set(channel, {
@@ -289,6 +325,7 @@ export class RelayTunnel {
   }
 
   closeChannel(channel) {
+    this.channelSockets.delete(channel);
     const state = this.channels.get(channel);
     if (state === undefined) return;
     for (const socket of state.streams.values()) socket.destroy();
@@ -310,14 +347,16 @@ export class RelayTunnel {
     socket.setKeepAlive(true, 30000);
     socket.on('connect', () => socket.setNoDelay(true));
     socket.on('data', (chunk) => {
-      if (this.socket === null) return;
+      // Direct clients get their own socket; relay clients share this.socket.
+      const target = this.channelSockets.get(channel) ?? this.socket;
+      if (target === null || target === undefined || target.destroyed) return;
       for (let offset = 0; offset < chunk.length; offset += MAX_CHUNK) {
         const piece = chunk.subarray(offset, Math.min(offset + MAX_CHUNK, chunk.length));
         const counter = state.txCounter;
         state.txCounter += 1;
         const header = frameHeader(channel, stream, FRAME.DATA, piece.length + 16);
         const sealed = seal(state.txKey, counter, header, piece);
-        void writeAsync(this.socket, Buffer.concat([header, sealed])).catch(() => {});
+        void writeAsync(target, Buffer.concat([header, sealed])).catch(() => {});
       }
     });
     socket.on('close', () => {
@@ -332,8 +371,12 @@ export class RelayTunnel {
     });
   }
 
-  send(channel, stream, type) {
-    if (this.socket === null || this.socket.destroyed) return Promise.resolve(false);
-    return writeAsync(this.socket, encodeFrame(channel, stream, type)).catch(() => false);
+  send(channel, stream, type, payload) {
+    const target = this.channelSockets.get(channel) ?? this.socket;
+    if (target === null || target === undefined || target.destroyed) return Promise.resolve(false);
+    const frame = payload === undefined
+      ? encodeFrame(channel, stream, type)
+      : Buffer.concat([frameHeader(channel, stream, type, payload.length), payload]);
+    return writeAsync(target, frame).catch(() => false);
   }
 }
