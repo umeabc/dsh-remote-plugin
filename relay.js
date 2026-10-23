@@ -243,9 +243,10 @@ export class RelayTunnel {
           plaintext = openSealed(state.rxKey, state.rxCounter, header, payload);
           state.rxCounter += 1;
         } catch (error) {
-          warn('relay: channel authentication failed, reconnecting:', error.message);
+          // Counters are per channel, so only this phone's channel is lost;
+          // dropping the whole tunnel would disconnect every other client.
+          warn('relay: channel authentication failed, closing that channel:', error.message);
           this.closeChannel(channel);
-          closeQuietly(this.socket);
           continue;
         }
         const socket = state.streams.get(stream);
