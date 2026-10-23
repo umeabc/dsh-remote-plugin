@@ -119,6 +119,39 @@
       });
 
     buildChrome();
+    watchBoot();
+  }
+
+  /**
+   * Tell the native shell when the sidebar data has landed, so it can keep a
+   * loading cover over the half-rendered frame instead of flashing it.
+   */
+  function watchBoot() {
+    var root = document.documentElement;
+    if (root.getAttribute('data-dshm-boot') === 'ready') return;
+    root.setAttribute('data-dshm-boot', 'pending');
+    var started = Date.now();
+    function check() {
+      var sidebar = document.querySelector('[class*="sidebarCol"]');
+      var ready = false;
+      if (sidebar !== null) {
+        var rows = sidebar.querySelectorAll('[class*="session"], [class*="Session"]');
+        ready = rows.length > 0 || sidebar.textContent.trim().length >= 8;
+      }
+      if (!ready && document.body !== null && document.body.textContent.trim().length > 240) {
+        ready = true;
+      }
+      if (ready) {
+        root.setAttribute('data-dshm-boot', 'ready');
+        return;
+      }
+      if (Date.now() - started > 20000) {
+        root.setAttribute('data-dshm-boot', 'timeout');
+        return;
+      }
+      setTimeout(check, 200);
+    }
+    check();
   }
 
   function onWorkspaceClick(event) {
