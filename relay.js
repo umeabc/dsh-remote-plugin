@@ -55,6 +55,7 @@ export class RelayTunnel {
     this.lastError = null;
     this.channels = new Map();
     this.loop = null;
+    this.lastRxAt = 0;
     this.backoff = 3000;
   }
 
@@ -116,6 +117,7 @@ export class RelayTunnel {
     }
     await this.loop?.catch(() => {});
     this.loop = null;
+    this.lastRxAt = 0;
   }
 
   async run() {
@@ -173,9 +175,24 @@ export class RelayTunnel {
     this.lastError = null;
     log(`relay: connected to ${endpoint.host}:${endpoint.port} room=${this.room.slice(0, 8)}`);
 
+    // Application-level heartbeat: the host must notice a half-open socket
+    // (sleep, Wi-Fi change) that TCP keepalive misses while traffic flows.
+    this.lastRxAt = Date.now();
+    const heartbeat = setInterval(() => {
+      if (!this.connected) return;
+      if (Date.now() - this.lastRxAt > 60_000) {
+        warn('relay: heartbeat timeout, redialing');
+        socket.destroy();
+        return;
+      }
+      void this.send(0, 0, FRAME.PING).catch(() => {});
+    }, 20_000);
+    if (typeof heartbeat.unref === 'function') heartbeat.unref();
+
     try {
       await this.readFrames(reader);
     } finally {
+      clearInterval(heartbeat);
       this.connected = false;
       this.destroyAll();
       this.socket = null;
@@ -187,6 +204,7 @@ export class RelayTunnel {
   async readFrames(reader) {
     for (;;) {
       const header = await reader.read(8);
+      this.lastRxAt = Date.now();
       const channel = header[0];
       const stream = header.readUInt32BE(1);
       const type = header[5];
@@ -202,9 +220,10 @@ export class RelayTunnel {
         continue;
       }
       if (type === FRAME.PING) {
-        // The phone's heartbeat: echo it so a dead socket is detected in
-        // seconds instead of waiting for the next user request.
-        await this.send(channel, 0, FRAME.PING);
+        // Phone heartbeats are echoed back to that phone. Our own heartbeat
+        // echo arrives on channel 0: just having it updates lastRxAt, and
+        // echoing it again would ping-pong forever.
+        if (channel !== 0) await this.send(channel, 0, FRAME.PING);
         continue;
       }
 
