@@ -77,7 +77,11 @@ export function directCandidates(config) {
   if (config?.publicHost) found.push(String(config.publicHost).trim());
   const seen = new Set(found);
   let v6count = 0;
-  for (const list of Object.values(networkInterfaces())) {
+  // Virtual/VPN adapters are never reachable from a phone; advertising them
+  // just makes the client waste a probe timeout on each.
+  const VIRTUAL = /dvpc|tailscale|wireguard|zerotier|vethernet|vmware|virtualbox|hyper-v|docker|wsl|loopback|tap|tun/i;
+  for (const [name, list] of Object.entries(networkInterfaces())) {
+    if (VIRTUAL.test(name)) continue;
     for (const net of list ?? []) {
       if (net.internal) continue;
       const family = net.family === 'IPv6' || net.family === 6 ? 'IPv6' : 'IPv4';
