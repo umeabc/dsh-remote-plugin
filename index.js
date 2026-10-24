@@ -28,10 +28,10 @@ import { ClientTunnel } from './tunnel.js';
 import { LocalProxy } from './proxy.js';
 import { qrSvg } from './qr.js';
 
-export const name = 'dsh-mobile-bridge';
+export const name = 'dsh-remote-plugin';
 export const inject = ['webServer', 'connection'];
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 
 const DEFAULTS = {
   lan: { enabled: true, host: '0.0.0.0', port: 8320, publicHost: '', sessionDays: 30 },
@@ -172,6 +172,12 @@ export async function apply(ctx, config) {
     });
   });
 
+
+  // Remote-desktop direction: the settings page polls this for link state.
+  route('exact', '/__pc/status', (request, response) => {
+    if (!authorized(request)) return sendJson(response, 401, { error: 'unauthorized' });
+    sendJson(response, 200, status());
+  });
 
   route('exact', '/__pc/link', (request, response) => {
     if (!authorized(request)) return sendText(response, 401, 'unauthorized');

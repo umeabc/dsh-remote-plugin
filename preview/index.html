@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<title>手机访问 · 设置页预览</title>
+<link rel="stylesheet" href="/theme.css" />
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--dsw-alias-bg-base); }
+  .stage { padding: 28px; display: flex; justify-content: center; }
+  .panel {
+    width: 720px;
+    background: var(--dsw-alias-bg-layer-1);
+    border: 1px solid var(--dsw-alias-border-l1);
+    border-radius: 18px;
+    padding: 22px 24px;
+    box-sizing: border-box;
+  }
+  .panel-title { font-size: 15px; font-weight: 600; color: var(--dsw-alias-label-primary); margin: 0 0 16px; }
+  #root { display: flex; flex-direction: column; gap: 20px; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="panel">
+    <p class="panel-title">设置 → 手机访问</p>
+    <div id="root"></div>
+  </div>
+</div>
+
+<script src="/react.js"></script>
+<script src="/react-dom.js"></script>
+<script>
+  // Mirrors what the shell does: <body data-ds-dark-theme> is the dark theme switch.
+  if (new URLSearchParams(location.search).get('theme') === 'dark') {
+    document.body.setAttribute('data-ds-dark-theme', '');
+  }
+
+  const sections = [];
+  window.__previewSections = sections;
+  window.__ModuleLoader__ = {
+    load({ id, factory }) {
+      window.__factory = { id, factory };
+    },
+  };
+</script>
+<script src="/client.js"></script>
+<script>
+  const React = window.React;
+  const requireFn = (name) => {
+    if (name === 'react') return React;
+    throw new Error('preview require: unsupported module ' + name);
+  };
+
+  const mod = window.__factory.factory(requireFn);
+
+  const ctx = {
+    effect(fn) { const off = fn(); return typeof off === 'function' ? off : () => {}; },
+    slots: {
+      entries() { return []; },
+      inject(_name, fn) { fn(); },
+      register(options, Component) { sections.push({ options, Component }); return () => {}; },
+    },
+    locale: {
+      getSnapshot() { return { active: new URLSearchParams(location.search).get('lang') ?? 'zh' }; },
+      subscribe() { return () => {}; },
+    },
+    get() { return undefined; },
+  };
+
+  mod.apply(ctx);
+
+  const order = ['mobile-access', 'remote-pc'];
+  const picked = sections
+    .filter((section) => order.includes(section.options.id))
+    .sort((a, b) => order.indexOf(a.options.id) - order.indexOf(b.options.id));
+
+  const root = window.ReactDOM.createRoot(document.getElementById('root'));
+  root.render(React.createElement(React.Fragment, null,
+    ...picked.map((section) => React.createElement(section.Component, { key: section.options.id })),
+  ));
+</script>
+</body>
+</html>

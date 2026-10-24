@@ -1,4 +1,4 @@
-# dsh-mobile-bridge: phone access to this desktop.
+# dsh-remote-plugin: phone access to this desktop (LAN pairing + relay tunnel),
 # `lan` serves the DSH UI on the local network after a six-digit pairing.
 # `relay` keeps an encrypted outbound tunnel to a relay server (see dsh-mobile-relay).
 - insert:

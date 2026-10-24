@@ -7,7 +7,7 @@
  */
 
 window.__ModuleLoader__.load({
-  id: 'dsh-mobile-bridge',
+  id: 'dsh-remote-plugin',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
@@ -18,12 +18,14 @@ window.__ModuleLoader__.load({
 .dshmb-card{border:1px solid var(--dsw-alias-border-l1);border-radius:14px;background:var(--dsw-alias-bg-layer-1);padding:18px}
 .dshmb-cardHead{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 .dshmb-cardTitle{font-size:14px;font-weight:600;line-height:20px}
-.dshmb-pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;line-height:16px;padding:2px 8px;border-radius:999px;border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary)}
+.dshmb-pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;line-height:16px;padding:2px 8px;border-radius:999px;border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary)}
 .dshmb-dot{width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-state-idle-primary)}
 .dshmb-dot[data-on="true"]{background:var(--dsw-alias-state-success-primary)}
 .dshmb-dot[data-warn="true"]{background:var(--dsw-alias-state-warn-primary)}
 .dshmb-row{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
-.dshmb-qr{width:180px;height:180px;flex:none;border-radius:12px;background:#fff;padding:8px;box-sizing:border-box}
+/* Scanners need a light quiet zone, so this stays white in both themes; the
+   border keeps it from floating on the dark card. */
+.dshmb-qr{width:180px;height:180px;flex:none;border-radius:12px;background:#fff;padding:8px;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);box-shadow:0 1px 3px rgba(0,0,0,.18)}
 .dshmb-qr img{width:100%;height:100%;display:block}
 .dshmb-detail{display:flex;flex-direction:column;gap:14px;flex:1;min-width:220px}
 .dshmb-field{display:flex;flex-direction:column;gap:4px}
@@ -33,13 +35,17 @@ window.__ModuleLoader__.load({
 .dshmb-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:28px;line-height:34px;letter-spacing:6px;font-weight:600}
 .dshmb-note{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
 .dshmb-actions{display:flex;gap:8px;flex-wrap:wrap}
-.dshmb-btn{appearance:none;border:1px solid var(--dsw-alias-border-l2,#3c414b);background:var(--dsw-alias-bg-layer-2,#23262c);color:var(--dsw-alias-label-primary,#e8eaed);border-radius:8px;padding:6px 12px;font-size:12.5px;line-height:18px;font-weight:500;cursor:pointer}
-.dshmb-btn:hover{background:var(--dsw-alias-bg-overlay)}
+.dshmb-btn{appearance:none;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:8px;padding:6px 12px;font-size:12.5px;line-height:18px;font-weight:500;cursor:pointer;transition:background-color .12s ease,border-color .12s ease}
+.dshmb-btn:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .dshmb-btn:disabled{opacity:.5;cursor:default}
-.dshmb-btn[data-kind="primary"]{background:var(--dsw-alias-brand-primary,#4e82e8);border-color:transparent;color:#fff;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.25)}
-.dshmb-btn[data-kind="primary"]:hover{filter:brightness(1.08)}
-.dshmb-input{flex:1;min-width:180px;border:1px solid var(--dsw-alias-border-l2,#3c414b);background:var(--dsw-alias-bg-base,#16181c);color:var(--dsw-alias-label-primary,#e8eaed);border-radius:8px;padding:7px 10px;font-size:13px;line-height:18px;outline:none}
-.dshmb-input:focus{border-color:var(--dsw-alias-brand-primary)}
+.dshmb-btn[data-kind="primary"]{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#0f1115));border-color:transparent;color:var(--dsw-alias-label-primary-foreground,#fff);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+/* The primary fill is near-white in the dark theme, so its label must use the
+   inverted foreground token instead of a hard-coded white. */
+.dshmb-btn[data-kind="primary"]:disabled{background:var(--dsw-alias-button-primary-dimmed,var(--dsw-alias-bg-layer-2));color:var(--dsw-alias-label-secondary);opacity:1;box-shadow:none}
+.dshmb-btn[data-kind="primary"]:hover{background:var(--dsw-alias-button-primary-hover,var(--dsw-alias-brand-primary,#0f1115))}
+.dshmb-input{flex:1;min-width:180px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);border-radius:8px;padding:7px 10px;font-size:13px;line-height:18px;outline:none}
+.dshmb-input::placeholder{color:var(--dsw-alias-label-tertiary)}
+.dshmb-input:focus{border-color:var(--dsw-alias-button-info-fill)}
 .dshmb-error{font-size:12px;line-height:18px;color:var(--dsw-alias-state-error-primary)}
 .dshmb-relayRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 @media (max-width:560px){.dshmb-qr{width:150px;height:150px}}
@@ -49,14 +55,18 @@ window.__ModuleLoader__.load({
 .dshrp-card{border:1px solid var(--dsw-alias-border-l1);border-radius:14px;background:var(--dsw-alias-bg-layer-1);padding:18px;display:flex;flex-direction:column;gap:12px}
 .dshrp-head{display:flex;align-items:center;gap:8px}
 .dshrp-title{font-size:14px;font-weight:600}
-.dshrp-pill{margin-left:auto;font-size:11.5px;padding:2px 8px;border-radius:999px;border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);display:inline-flex;align-items:center;gap:6px}
+.dshrp-pill{margin-left:auto;font-size:11.5px;padding:2px 8px;border-radius:999px;border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);display:inline-flex;align-items:center;gap:6px}
 .dshrp-dot{width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-state-idle-primary)}
 .dshrp-dot[data-on="true"]{background:var(--dsw-alias-state-success-primary)}
 .dshrp-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.dshrp-input{flex:1;min-width:220px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:ui-monospace,Menlo,Consolas,monospace;outline:none}
-.dshrp-input:focus{border-color:var(--dsw-alias-brand-primary)}
-.dshrp-btn{appearance:none;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer}
-.dshrp-btn[data-kind="primary"]{background:var(--dsw-alias-brand-primary);border-color:transparent;color:#fff}
+.dshrp-input{flex:1;min-width:220px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:ui-monospace,Menlo,Consolas,monospace;outline:none}
+.dshrp-input::placeholder{color:var(--dsw-alias-label-tertiary)}
+.dshrp-input:focus{border-color:var(--dsw-alias-button-info-fill)}
+.dshrp-btn{appearance:none;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer;transition:background-color .12s ease,border-color .12s ease}
+.dshrp-btn:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.dshrp-btn[data-kind="primary"]{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#0f1115));border-color:transparent;color:var(--dsw-alias-label-primary-foreground,#fff)}
+.dshrp-btn[data-kind="primary"]:hover{background:var(--dsw-alias-button-primary-hover,var(--dsw-alias-brand-primary,#0f1115))}
+.dshrp-btn[data-kind="primary"]:disabled{background:var(--dsw-alias-button-primary-dimmed,var(--dsw-alias-bg-layer-2));color:var(--dsw-alias-label-secondary);opacity:1}
 .dshrp-btn:disabled{opacity:.5;cursor:default}
 .dshrp-note{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
 .dshrp-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
@@ -153,63 +163,93 @@ window.__ModuleLoader__.load({
     }
 
 
-    function RemotePcSection() {
-      const [status, setStatus] = React.useState(null);
-      const [link, setLink] = React.useState('');
-      const [busy, setBusy] = React.useState(false);
-      const [error, setError] = React.useState('');
+    const RPC = {
+      zh: {
+        lead: '粘贴另一台电脑「手机访问」里的 dshm:// 连接码，本机就能直接操作那台电脑上的 DSH；任务、模型调用和工具执行都仍在远端运行。',
+        title: '远端连接',
+        connected: '已连接',
+        connecting: '连接中…',
+        unconfigured: '未配置',
+        placeholder: 'dshm://relay?url=…&room=…&key=…',
+        save: '保存并连接',
+        saving: '连接中…',
+        entry: '本机入口：',
+        open: '打开远端界面',
+      },
+      en: {
+        lead: 'Paste the dshm:// link from another desktop’s Phone access page and drive that desktop from here. The session, model calls and tool runs keep running on the remote machine.',
+        title: 'Remote desktop',
+        connected: 'Connected',
+        connecting: 'Connecting…',
+        unconfigured: 'Not configured',
+        placeholder: 'dshm://relay?url=…&room=…&key=…',
+        save: 'Connect',
+        saving: 'Connecting…',
+        entry: 'Local entry:',
+        open: 'Open remote UI',
+      },
+    };
 
-      const refresh = React.useCallback(() => {
-        fetch('/__pc/status', { credentials: 'same-origin' })
-          .then((response) => response.json())
-          .then((value) => setStatus(value.client ?? null))
-          .catch(() => setStatus(null));
-      }, []);
+    function createRemotePcSection(ctx) {
+      return function RemotePcSection() {
+        const r = RPC[useLanguage(ctx)];
+        const [status, setStatus] = React.useState(null);
+        const [link, setLink] = React.useState('');
+        const [busy, setBusy] = React.useState(false);
+        const [error, setError] = React.useState('');
 
-      React.useEffect(() => {
-        refresh();
-        const timer = setInterval(refresh, 4000);
-        return () => clearInterval(timer);
-      }, [refresh]);
+        const refresh = React.useCallback(() => {
+          fetch('/__pc/status', { credentials: 'same-origin' })
+            .then((response) => response.json())
+            .then((value) => setStatus(value.client ?? null))
+            .catch(() => setStatus(null));
+        }, []);
 
-      const save = () => {
-        setBusy(true);
-        setError('');
-        fetch('/__pc/link', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ link: link.trim() }),
-        })
-          .then((response) => response.json())
-          .then((value) => { if (value?.error) setError(value.error); else setLink(''); refresh(); })
-          .catch((reason) => setError(String(reason)))
-          .finally(() => setBusy(false));
+        React.useEffect(() => {
+          refresh();
+          const timer = setInterval(refresh, 4000);
+          return () => clearInterval(timer);
+        }, [refresh]);
+
+        const save = () => {
+          setBusy(true);
+          setError('');
+          fetch('/__pc/link', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ link: link.trim() }),
+          })
+            .then((response) => response.json())
+            .then((value) => { if (value?.error) setError(value.error); else setLink(''); refresh(); })
+            .catch((reason) => setError(String(reason)))
+            .finally(() => setBusy(false));
+        };
+
+        const connected = status?.connected === true;
+        return h('div', { className: 'dshrp-root' },
+          h('p', { className: 'dshrp-lead' }, r.lead),
+          h('div', { className: 'dshrp-card' },
+            h('div', { className: 'dshrp-head' },
+              h('span', { className: 'dshrp-title' }, r.title),
+              h('span', { className: 'dshrp-pill' },
+                h('span', { className: 'dshrp-dot', 'data-on': connected ? 'true' : 'false' }),
+                connected ? r.connected : (status?.url ? r.connecting : r.unconfigured))),
+            h('div', { className: 'dshrp-row' },
+              h('input', {
+                className: 'dshrp-input',
+                placeholder: r.placeholder,
+                spellCheck: false,
+                value: link,
+                onChange: (event) => setLink(event.target.value),
+              }),
+              h('button', { className: 'dshrp-btn', 'data-kind': 'primary', disabled: busy || link.trim() === '', onClick: save },
+                busy ? r.saving : r.save)),
+            status?.url ? h('div', { className: 'dshrp-row' },
+              h('span', { className: 'dshrp-note' }, r.entry, h('span', { className: 'dshrp-code' }, status.url)),
+              h('button', { className: 'dshrp-btn', onClick: () => window.open(status.url, '_blank', 'noopener') }, r.open)) : null,
+            error !== '' ? h('div', { className: 'dshrp-error' }, error) : null));
       };
-
-      const connected = status?.connected === true;
-      return h('div', { className: 'dshrp-root' },
-        h('p', { className: 'dshrp-lead' },
-          '粘贴另一台电脑「手机访问」里的 dshm:// 连接码，本机就能直接操作那台电脑上的 DSH；任务、模型调用和工具执行都仍在远端运行。'),
-        h('div', { className: 'dshrp-card' },
-          h('div', { className: 'dshrp-head' },
-            h('span', { className: 'dshrp-title' }, '远端连接'),
-            h('span', { className: 'dshrp-pill' },
-              h('span', { className: 'dshrp-dot', 'data-on': connected ? 'true' : 'false' }),
-              connected ? '已连接' : (status?.url ? '连接中…' : '未配置'))),
-          h('div', { className: 'dshrp-row' },
-            h('input', {
-              className: 'dshrp-input',
-              placeholder: 'dshm://relay?url=…&room=…&key=…',
-              value: link,
-              onChange: (event) => setLink(event.target.value),
-            }),
-            h('button', { className: 'dshrp-btn', 'data-kind': 'primary', disabled: busy || link.trim() === '', onClick: save },
-              busy ? '保存中…' : '保存并连接')),
-          status?.url ? h('div', { className: 'dshrp-row' },
-            h('span', { className: 'dshrp-note' }, '本机入口：', h('span', { className: 'dshrp-code' }, status.url)),
-            h('button', { className: 'dshrp-btn', onClick: () => window.open(status.url, '_blank', 'noopener') }, '打开远端界面')) : null,
-          error !== '' ? h('div', { className: 'dshrp-error' }, error) : null));
     }
 
     function createSection(ctx) {
@@ -404,8 +444,8 @@ window.__ModuleLoader__.load({
       apply(ctx) {
         ctx.effect(() => {
           const tag = document.createElement('style');
-          tag.dataset.plugin = 'dsh-mobile-bridge';
-          tag.dataset.pluginCss = 'dsh-mobile-bridge/settings.css';
+          tag.dataset.plugin = 'dsh-remote-plugin';
+          tag.dataset.pluginCss = 'dsh-remote-plugin/settings.css';
           tag.textContent = CSS;
           document.head.appendChild(tag);
           return () => tag.remove();
@@ -424,7 +464,7 @@ window.__ModuleLoader__.load({
           id: 'remote-pc',
           order: 18,
           label: () => (languageOf(ctx) === 'zh' ? '远程电脑' : 'Remote PC'),
-        }, RemotePcSection));
+        }, createRemotePcSection(ctx)));
       },
     };
   },
