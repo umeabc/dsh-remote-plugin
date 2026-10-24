@@ -31,7 +31,7 @@ import { qrSvg } from './qr.js';
 export const name = 'dsh-remote-plugin';
 export const inject = ['webServer', 'connection'];
 
-const VERSION = '0.1.1';
+const VERSION = '0.2.0';
 
 const DEFAULTS = {
   lan: { enabled: true, host: '0.0.0.0', port: 8320, publicHost: '', sessionDays: 30 },
@@ -116,7 +116,7 @@ export async function apply(ctx, config) {
     const proxy = new LocalProxy(tunnel, Number(settings.client.port) || 8331);
     await proxy.start().catch((error) => warn(`client proxy: ${error.message}`));
     tunnel.start();
-    client = { tunnel, proxy, link };
+    client = { tunnel, proxy, link, host: `${parsed.host}:${parsed.port}` };
     log(`client: linked ${parsed.host}:${parsed.port}`);
   };
 
@@ -124,6 +124,7 @@ export async function apply(ctx, config) {
     client: {
       link: client?.link ? client.link.replace(/key=[^&]+/, 'key=***') : (store.data.clientLink ? String(store.data.clientLink).replace(/key=[^&]+/, 'key=***') : null),
       connected: client?.tunnel?.isConnected === true,
+      host: client?.host ?? null,
       url: client?.proxy?.url ?? null,
     },
     version: VERSION,
@@ -172,6 +173,21 @@ export async function apply(ctx, config) {
     });
   });
 
+
+  // Remote-desktop direction: stop the outbound tunnel and its loopback proxy.
+  route('exact', '/__pc/disconnect', (request, response) => {
+    if (!authorized(request)) return sendJson(response, 401, { error: 'unauthorized' });
+    if (request.method !== 'POST') return sendJson(response, 405, { error: 'method not allowed' });
+    store.data.clientLink = '';
+    void (async () => {
+      await client?.proxy?.stop().catch(() => {});
+      await client?.tunnel?.stop().catch(() => {});
+      client = null;
+      await store.save().catch((error) => warn(`client: cannot persist disconnect: ${error.message}`));
+      log('client: disconnected');
+      sendJson(response, 200, status());
+    })();
+  });
 
   // Remote-desktop direction: the settings page polls this for link state.
   route('exact', '/__pc/status', (request, response) => {

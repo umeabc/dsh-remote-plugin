@@ -71,6 +71,13 @@ window.__ModuleLoader__.load({
 .dshrp-note{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
 .dshrp-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
 .dshrp-error{font-size:12px;color:var(--dsw-alias-state-error-primary)}
+/* Takeover: the remote DSH fills this window under a one-line control bar. */
+.dshrp-takeover{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}
+.dshrp-bar{flex:none;display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;background:var(--dsw-alias-bg-base);border-bottom:1px solid var(--dsw-alias-border-l2);box-sizing:border-box}
+.dshrp-barTitle{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;flex:none}
+.dshrp-barMeta{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--dsw-alias-label-secondary);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dshrp-barSpacer{flex:1}
+.dshrp-frame{flex:1;width:100%;border:0;display:block;background:var(--dsw-alias-bg-base)}
 `;
 
     const TEXT = {
@@ -165,7 +172,7 @@ window.__ModuleLoader__.load({
 
     const RPC = {
       zh: {
-        lead: '粘贴另一台电脑「手机访问」里的 dshm:// 连接码，本机就能直接操作那台电脑上的 DSH；任务、模型调用和工具执行都仍在远端运行。',
+        lead: '粘贴另一台电脑「手机访问」里的 dshm:// 连接码，本机就能直接操作那台电脑上的 DSH：整个窗口切成远端界面，任务、模型调用和工具执行都仍在远端运行。',
         title: '远端连接',
         connected: '已连接',
         connecting: '连接中…',
@@ -173,11 +180,18 @@ window.__ModuleLoader__.load({
         placeholder: 'dshm://relay?url=…&room=…&key=…',
         save: '保存并连接',
         saving: '连接中…',
-        entry: '本机入口：',
-        open: '打开远端界面',
+        takeover: '接管整个窗口',
+        disconnect: '断开连接',
+        disconnecting: '正在断开…',
+        remote: '远端：',
+        takeoverHint: '接管后本窗口显示远端 DSH，顶部一条工具栏，右侧「断开连接」随时可以断开并回到本机。',
+        scanHint: '连接码在另一台电脑的「设置 → 手机访问 → 中转服务器」里，点「复制连接码」。',
+        barTitle: '远端模式',
+        barExit: '退出视图',
+        barDisconnect: '断开连接',
       },
       en: {
-        lead: 'Paste the dshm:// link from another desktop’s Phone access page and drive that desktop from here. The session, model calls and tool runs keep running on the remote machine.',
+        lead: 'Paste the dshm:// link from another desktop’s Phone access page and drive that desktop from here: the whole window switches to the remote DSH, while the session, model calls and tool runs stay on the remote machine.',
         title: 'Remote desktop',
         connected: 'Connected',
         connecting: 'Connecting…',
@@ -185,14 +199,111 @@ window.__ModuleLoader__.load({
         placeholder: 'dshm://relay?url=…&room=…&key=…',
         save: 'Connect',
         saving: 'Connecting…',
-        entry: 'Local entry:',
-        open: 'Open remote UI',
+        takeover: 'Take over this window',
+        disconnect: 'Disconnect',
+        disconnecting: 'Disconnecting…',
+        remote: 'Remote: ',
+        takeoverHint: 'Taking over shows the remote DSH in this window with a toolbar on top; “Disconnect” there brings the local desktop back at any time.',
+        scanHint: 'Find the link under Settings → Phone access → Relay server on the other desktop, then “Copy link”.',
+        barTitle: 'Remote mode',
+        barExit: 'Exit view',
+        barDisconnect: 'Disconnect',
       },
     };
 
+    /** Where the takeover overlay remembers its remote URL, so a reload keeps the view. */
+    const TAKEOVER_KEY = 'dsh-remote-plugin:takeover';
+
+    function readTakeoverUrl() {
+      try {
+        return window.localStorage.getItem(TAKEOVER_KEY) ?? '';
+      } catch {
+        return '';
+      }
+    }
+
+    function writeTakeoverUrl(value) {
+      try {
+        if (value === '') window.localStorage.removeItem(TAKEOVER_KEY);
+        else window.localStorage.setItem(TAKEOVER_KEY, value);
+      } catch {
+        /* storage unavailable: takeover simply does not survive a reload */
+      }
+    }
+
+    let takeover = null;
+
+    /** Drop the overlay and leave the tunnel alone. */
+    function leaveTakeover() {
+      if (takeover === null) return;
+      const { root, onExit } = takeover;
+      takeover = null;
+      writeTakeoverUrl('');
+      root.remove();
+      if (typeof onExit === 'function') onExit();
+    }
+
+    /** Full-window remote view: a control bar plus the tunnel's own loopback URL. */
+    function enterTakeover(url, host, copy, onExit) {
+      if (takeover !== null) return;
+      writeTakeoverUrl(url);
+
+      const root = document.createElement('div');
+      root.className = 'dshrp-takeover';
+
+      const bar = document.createElement('div');
+      bar.className = 'dshrp-bar';
+
+      const title = document.createElement('span');
+      title.className = 'dshrp-barTitle';
+      const dot = document.createElement('span');
+      dot.className = 'dshrp-dot';
+      dot.dataset.on = 'true';
+      title.append(dot, document.createTextNode(copy.barTitle));
+
+      const meta = document.createElement('span');
+      meta.className = 'dshrp-barMeta';
+      meta.textContent = host !== '' ? host : url;
+      meta.title = url;
+
+      const spacer = document.createElement('span');
+      spacer.className = 'dshrp-barSpacer';
+
+      const exit = document.createElement('button');
+      exit.type = 'button';
+      exit.className = 'dshrp-btn';
+      exit.textContent = copy.barExit;
+
+      const cut = document.createElement('button');
+      cut.type = 'button';
+      cut.className = 'dshrp-btn';
+      cut.dataset.kind = 'primary';
+      cut.textContent = copy.barDisconnect;
+
+      const frame = document.createElement('iframe');
+      frame.className = 'dshrp-frame';
+      frame.title = copy.barTitle;
+      frame.setAttribute('allow', 'clipboard-read; clipboard-write');
+      frame.src = url;
+
+      exit.addEventListener('click', () => leaveTakeover());
+      cut.addEventListener('click', () => {
+        cut.disabled = true;
+        cut.textContent = copy.disconnecting;
+        leaveTakeover();
+        void fetch('/__pc/disconnect', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+      });
+
+      bar.append(title, meta, spacer, exit, cut);
+      root.append(bar, frame);
+      document.body.append(root);
+      takeover = { root, onExit };
+    }
+
     function createRemotePcSection(ctx) {
       return function RemotePcSection() {
-        const r = RPC[useLanguage(ctx)];
+        const lang = useLanguage(ctx);
+        const r = RPC[lang];
         const [status, setStatus] = React.useState(null);
         const [link, setLink] = React.useState('');
         const [busy, setBusy] = React.useState(false);
@@ -211,6 +322,18 @@ window.__ModuleLoader__.load({
           return () => clearInterval(timer);
         }, [refresh]);
 
+        const connected = status?.connected === true;
+        const url = status?.url ?? '';
+        const host = status?.host ?? '';
+
+        // A reload while the takeover is remembered re-enters it; once the link is
+        // gone the overlay is not allowed to outlive the connection.
+        React.useEffect(() => {
+          if (window.top !== window.self) return;
+          if (connected && url !== '' && readTakeoverUrl() !== '') enterTakeover(url, host, r, refresh);
+          if (!connected && readTakeoverUrl() !== '') leaveTakeover();
+        }, [connected, url, host]);
+
         const save = () => {
           setBusy(true);
           setError('');
@@ -221,33 +344,69 @@ window.__ModuleLoader__.load({
             body: JSON.stringify({ link: link.trim() }),
           })
             .then((response) => response.json())
-            .then((value) => { if (value?.error) setError(value.error); else setLink(''); refresh(); })
+            .then((value) => {
+              if (value?.error) {
+                setError(value.error);
+                return;
+              }
+              setLink('');
+              const next = value?.client ?? null;
+              setStatus(next);
+              if (next?.url) enterTakeover(next.url, next.host ?? '', r, refresh);
+            })
             .catch((reason) => setError(String(reason)))
             .finally(() => setBusy(false));
         };
 
-        const connected = status?.connected === true;
+        const disconnect = () => {
+          setBusy(true);
+          setError('');
+          leaveTakeover();
+          fetch('/__pc/disconnect', { method: 'POST', credentials: 'same-origin' })
+            .then((response) => response.json())
+            .then((value) => setStatus(value?.client ?? null))
+            .catch((reason) => setError(String(reason)))
+            .finally(() => setBusy(false));
+        };
+
         return h('div', { className: 'dshrp-root' },
           h('p', { className: 'dshrp-lead' }, r.lead),
           h('div', { className: 'dshrp-card' },
             h('div', { className: 'dshrp-head' },
               h('span', { className: 'dshrp-title' }, r.title),
               h('span', { className: 'dshrp-pill' },
-                h('span', { className: 'dshrp-dot', 'data-on': connected ? 'true' : 'false' }),
-                connected ? r.connected : (status?.url ? r.connecting : r.unconfigured))),
-            h('div', { className: 'dshrp-row' },
-              h('input', {
-                className: 'dshrp-input',
-                placeholder: r.placeholder,
-                spellCheck: false,
-                value: link,
-                onChange: (event) => setLink(event.target.value),
-              }),
-              h('button', { className: 'dshrp-btn', 'data-kind': 'primary', disabled: busy || link.trim() === '', onClick: save },
-                busy ? r.saving : r.save)),
-            status?.url ? h('div', { className: 'dshrp-row' },
-              h('span', { className: 'dshrp-note' }, r.entry, h('span', { className: 'dshrp-code' }, status.url)),
-              h('button', { className: 'dshrp-btn', onClick: () => window.open(status.url, '_blank', 'noopener') }, r.open)) : null,
+                h('span', {
+                  className: 'dshrp-dot',
+                  'data-on': connected ? 'true' : 'false',
+                  'data-warn': !connected && url !== '' ? 'true' : 'false',
+                }),
+                connected ? r.connected : (url !== '' ? r.connecting : r.unconfigured))),
+            connected
+              ? h('div', { className: 'dshrp-row' },
+                h('span', { className: 'dshrp-note' }, r.remote, h('span', { className: 'dshrp-code' }, host !== '' ? host : url)),
+                h('button', {
+                  className: 'dshrp-btn',
+                  'data-kind': 'primary',
+                  disabled: url === '',
+                  onClick: () => enterTakeover(url, host, r, refresh),
+                }, r.takeover),
+                h('button', { className: 'dshrp-btn', disabled: busy, onClick: disconnect },
+                  busy ? r.disconnecting : r.disconnect))
+              : h('div', { className: 'dshrp-row' },
+                h('input', {
+                  className: 'dshrp-input',
+                  placeholder: r.placeholder,
+                  spellCheck: false,
+                  value: link,
+                  onChange: (event) => setLink(event.target.value),
+                }),
+                h('button', {
+                  className: 'dshrp-btn',
+                  'data-kind': 'primary',
+                  disabled: busy || link.trim() === '',
+                  onClick: save,
+                }, busy ? r.saving : r.save)),
+            h('p', { className: 'dshrp-note' }, connected ? r.takeoverHint : r.scanHint),
             error !== '' ? h('div', { className: 'dshrp-error' }, error) : null));
       };
     }

@@ -35,8 +35,19 @@ HMR 打开时改动即时生效，否则重启 DSH。
 - **同一 Wi-Fi**：地址、二维码、6 位配对码、已配对设备数。手机扫码 → 输入配对码 → 进入 DSH。首次进入后可在手机浏览器里「添加到主屏幕」。
 - **中转服务器**：填地址（如 `relay.example.com:9443`）并保存，状态变「已连接」后，手机 App 扫右侧二维码即可。二维码里是 `dshm://relay?url=…&room=…&key=…` 连接码，也可以「复制连接码」粘贴进 App。
 
-**设置 → 远程电脑**：把另一台电脑「手机访问」里的 `dshm://` 连接码粘进来，本机就能直接操作那台电脑上的 DSH；
-会话、模型调用和工具执行都还在远端跑，本机只做代理。
+**设置 → 远程电脑**：把另一台电脑「手机访问」里的 `dshm://` 连接码粘进来。
+
+连接成功后**整个窗口切成远端**：顶部一条 40px 工具栏（「远端模式 · 远端地址」+「退出视图」+「断开连接」），
+下面整块是远端 DSH 的界面（`http://127.0.0.1:8331/` 的 iframe，由加密隧道代理过去），
+不再弹新浏览器窗口。会话、模型调用和工具执行都在远端跑，本机只转发字节。
+
+- **断开连接**（工具栏右侧，或「设置 → 远程电脑」里那颗按钮）：停掉隧道和 8331 监听、清掉保存的连接码，
+  窗口立刻回到本机 DSH。
+- **退出视图**：只收起远端界面，连接保留；回到设置页还能再「接管整个窗口」。
+- 接管状态记在 `localStorage`（`dsh-remote-plugin:takeover`），刷新或重开窗口会直接回到远端；
+  连接断了会自动收起，不会把你困在一块白屏上。
+- 断连后想再连：`dshm://` 连接码还在远端「手机访问 → 中转服务器」里，重新复制粘贴即可（断开会清掉本机保存的那份）。
+
 
 配对码 10 分钟有效、用后即换；「全部断开」撤销全部手机授权。
 
@@ -132,6 +143,7 @@ netsh advfirewall firewall delete rule name="DSH Mobile Bridge (LAN 8320)"
 | `POST /__mobile/relay/reset` | 更换房间（room/key） |
 | `GET /__mobile/direct.json` | 直连候选地址 |
 | `GET /__pc/status` · `POST /__pc/link` | 远程电脑方向：状态、保存连接码 |
+| `POST /__pc/disconnect` | 停掉远端隧道 + 8331 代理，并清掉保存的连接码 |
 
 模型侧还有一个 `mobile_access` 工具，`action` 取 `status` / `pair` / `revoke` / `relay-reset`。
 
@@ -160,4 +172,5 @@ node preview/extract-theme.mjs "D:/dsh/resources/app.asar"
 node preview/serve.mjs 4599   # http://127.0.0.1:4599/?theme=dark
 ```
 
-改完样式与暗色对比度实测见 [`docs/2026-10-24-contrast-and-boot-fix.md`](docs/2026-10-24-contrast-and-boot-fix.md)。
+改完样式与暗色对比度实测见 [`docs/2026-10-24-contrast-and-boot-fix.md`](docs/2026-10-24-contrast-and-boot-fix.md)；
+「接管整个窗口」的实现与限制见 [`docs/2026-10-24-takeover.md`](docs/2026-10-24-takeover.md)。

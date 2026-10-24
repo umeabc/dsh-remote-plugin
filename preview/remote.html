@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<title>远端 DSH · 占位</title>
+<link rel="stylesheet" href="/theme.css" />
+<style>
+  html, body { height: 100%; margin: 0; background: var(--dsw-alias-bg-base); }
+  body { display: flex; color: var(--dsw-alias-label-primary); font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  .side { width: 232px; flex: none; border-right: 1px solid var(--dsw-alias-border-l1); padding: 16px 12px; display: flex; flex-direction: column; gap: 10px; }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
+  .badge { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-secondary); }
+  .row { font-size: 12.5px; color: var(--dsw-alias-label-secondary); padding: 7px 8px; border-radius: 8px; }
+  .row.on { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+  .main { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; }
+  .title { font-size: 20px; font-weight: 650; }
+  .hint { font-size: 12.5px; color: var(--dsw-alias-label-secondary); }
+  .mockInput { width: 520px; max-width: 70%; height: 84px; border-radius: 14px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-1); }
+</style>
+</head>
+<body>
+  <aside class="side">
+    <div class="brand">DeepSeek Harness <span class="badge">远端</span></div>
+    <div class="row on">修复 dsh 崩溃与会话丢失</div>
+    <div class="row">手机访问插件：断开按钮</div>
+    <div class="row">Xray 多端口管理</div>
+    <div class="row">分镜复刻工具包</div>
+  </aside>
+  <main class="main">
+    <div class="title">远端桌面 · 占位页</div>
+    <div class="hint">预览里这一块就是接管后 iframe 里的内容；真机上它是远端 DSH 的完整界面。</div>
+    <div class="mockInput"></div>
+  </main>
+</body>
+</html>

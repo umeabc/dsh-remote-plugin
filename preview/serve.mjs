@@ -52,6 +52,17 @@ const status = {
   client: { link: null, connected: false, url: null },
 };
 
+// Stand-in for the controller side: "connected" points the takeover overlay back at
+// this very server, so the remote view can be exercised without a second machine.
+const connectedClient = (port) => ({
+  link: 'dshm://relay?url=relay.example.com:9443&room=9f2c41d8a7b34e05b6c1&key=***',
+  host: 'relay.example.com:9443',
+  connected: true,
+  url: `http://127.0.0.1:${port}/remote.html`,
+});
+
+let pcConnected = true;
+
 const json = (response, value) => {
   response.writeHead(200, { 'content-type': TYPES['.json'], 'cache-control': 'no-store' });
   response.end(JSON.stringify(value));
@@ -61,8 +72,17 @@ createServer(async (request, response) => {
   const url = new URL(request.url, 'http://127.0.0.1');
 
   if (url.pathname === '/__mobile/status') return json(response, status);
-  if (url.pathname === '/__pc/status') return json(response, { client: null });
-  if (url.pathname === '/__pc/link') return json(response, { ...status, error: 'preview: link is not wired' });
+  if (url.pathname === '/__pc/status') {
+    return json(response, { client: pcConnected ? connectedClient(PORT) : null });
+  }
+  if (url.pathname === '/__pc/disconnect') {
+    pcConnected = false;
+    return json(response, { ...status, client: null });
+  }
+  if (url.pathname === '/__pc/link') {
+    pcConnected = true;
+    return json(response, { ...status, client: connectedClient(PORT) });
+  }
 
   if (url.pathname === '/__mobile/qr.svg') {
     const text = url.searchParams.get('kind') === 'relay' ? pairing : lanUrl;
