@@ -10,7 +10,7 @@
 
 import { createServer } from 'node:net';
 import { networkInterfaces } from 'node:os';
-import { log, warn } from './core.js';
+import { closeServer, log, warn } from './core.js';
 
 const MAX_CONNECTIONS = 8;
 
@@ -63,7 +63,7 @@ export class DirectServer {
     const server = this.server;
     this.server = null;
     if (server === null) return;
-    await new Promise((resolve) => server.close(() => resolve()));
+    await closeServer(server);
   }
 
   status() {

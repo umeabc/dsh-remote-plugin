@@ -62,7 +62,7 @@ window.__ModuleLoader__.load({
 .dshrp-input{flex:1;min-width:220px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:ui-monospace,Menlo,Consolas,monospace;outline:none}
 .dshrp-input::placeholder{color:var(--dsw-alias-label-tertiary)}
 .dshrp-input:focus{border-color:var(--dsw-alias-button-info-fill)}
-.dshrp-btn{appearance:none;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer;transition:background-color .12s ease,border-color .12s ease}
+.dshrp-btn{appearance:none;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer;transition:background-color .12s ease,border-color .12s ease;-webkit-app-region:no-drag;app-region:no-drag}
 .dshrp-btn:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .dshrp-btn[data-kind="primary"]{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#0f1115));border-color:transparent;color:var(--dsw-alias-label-primary-foreground,#fff)}
 .dshrp-btn[data-kind="primary"]:hover{background:var(--dsw-alias-button-primary-hover,var(--dsw-alias-brand-primary,#0f1115))}
@@ -71,13 +71,16 @@ window.__ModuleLoader__.load({
 .dshrp-note{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
 .dshrp-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
 .dshrp-error{font-size:12px;color:var(--dsw-alias-state-error-primary)}
-/* Takeover: the remote DSH fills this window under a one-line control bar. */
+/* Takeover: the remote DSH fills this window above a one-line control bar.
+   The bar sits at the bottom on purpose: on Windows the desktop window draws its
+   native caption buttons (minimise / maximise / close) over the top-right 40px of
+   the page, and they swallow clicks meant for anything underneath. */
 .dshrp-takeover{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}
-.dshrp-bar{flex:none;display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;background:var(--dsw-alias-bg-base);border-bottom:1px solid var(--dsw-alias-border-l2);box-sizing:border-box}
+.dshrp-bar{order:2;flex:none;display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;background:var(--dsw-alias-bg-base);border-top:1px solid var(--dsw-alias-border-l2);box-sizing:border-box;-webkit-app-region:no-drag;app-region:no-drag}
 .dshrp-barTitle{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;flex:none}
 .dshrp-barMeta{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--dsw-alias-label-secondary);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dshrp-barSpacer{flex:1}
-.dshrp-frame{flex:1;width:100%;border:0;display:block;background:var(--dsw-alias-bg-base)}
+.dshrp-frame{order:1;flex:1;width:100%;border:0;display:block;background:var(--dsw-alias-bg-base)}
 `;
 
     const TEXT = {
@@ -214,6 +217,30 @@ window.__ModuleLoader__.load({
     /** Where the takeover overlay remembers its remote URL, so a reload keeps the view. */
     const TAKEOVER_KEY = 'dsh-remote-plugin:takeover';
 
+    /**
+     * The remote bridge injects its phone layout into every HTML response it proxies.
+     * A desktop controller wants the plain shell, so it drops this cookie first —
+     * cookies ignore ports, so it rides along through the tunnel and the bridge
+     * skips the injection for this browser only.
+     */
+    const DESKTOP_COOKIE = 'dshmb_desktop';
+
+    function markDesktopView() {
+      try {
+        document.cookie = `${DESKTOP_COOKIE}=1; path=/; max-age=31536000; samesite=lax`;
+      } catch {
+        /* cookies unavailable: the remote side then shows its phone layout */
+      }
+    }
+
+    function clearDesktopView() {
+      try {
+        document.cookie = `${DESKTOP_COOKIE}=; path=/; max-age=0; samesite=lax`;
+      } catch {
+        /* nothing to clear */
+      }
+    }
+
     function readTakeoverUrl() {
       try {
         return window.localStorage.getItem(TAKEOVER_KEY) ?? '';
@@ -247,6 +274,7 @@ window.__ModuleLoader__.load({
     function enterTakeover(url, host, copy, onExit) {
       if (takeover !== null) return;
       writeTakeoverUrl(url);
+      markDesktopView();
 
       const root = document.createElement('div');
       root.className = 'dshrp-takeover';
@@ -290,6 +318,7 @@ window.__ModuleLoader__.load({
       cut.addEventListener('click', () => {
         cut.disabled = true;
         cut.textContent = copy.disconnecting;
+        clearDesktopView();
         leaveTakeover();
         void fetch('/__pc/disconnect', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
       });
@@ -362,6 +391,7 @@ window.__ModuleLoader__.load({
           setBusy(true);
           setError('');
           leaveTakeover();
+          clearDesktopView();
           fetch('/__pc/disconnect', { method: 'POST', credentials: 'same-origin' })
             .then((response) => response.json())
             .then((value) => setStatus(value?.client ?? null))

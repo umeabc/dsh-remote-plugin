@@ -9,6 +9,7 @@ import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import {
+  closeServer,
   hmacHex,
   log,
   randomToken,
@@ -228,7 +229,7 @@ export class LanBridge {
     if (this.server === null) return;
     const server = this.server;
     this.server = null;
-    await new Promise((resolve) => server.close(resolve));
+    await closeServer(server);
   }
 
   status() {

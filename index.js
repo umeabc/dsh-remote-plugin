@@ -12,7 +12,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { appendFile, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import {
   Store,
@@ -31,7 +31,7 @@ import { qrSvg } from './qr.js';
 export const name = 'dsh-remote-plugin';
 export const inject = ['webServer', 'connection'];
 
-const VERSION = '0.2.0';
+const VERSION = '0.2.1';
 
 const DEFAULTS = {
   lan: { enabled: true, host: '0.0.0.0', port: 8320, publicHost: '', sessionDays: 30 },
@@ -303,12 +303,6 @@ export async function apply(ctx, config) {
   const shutdown = async () => {
     if (stopping) return;
     stopping = true;
-    await client?.proxy?.stop().catch(() => {});
-    await client?.tunnel?.stop().catch(() => {});
-    await direct?.stop().catch(() => {});
-    await relay?.stop().catch(() => {});
-    await lan?.stop().catch(() => {});
-    await upstream.stop().catch(() => {});
     for (const dispose of routes.splice(0)) {
       try {
         dispose();
@@ -316,17 +310,30 @@ export async function apply(ctx, config) {
         /* already gone */
       }
     }
+    await client?.proxy?.stop().catch(() => {});
+    await client?.tunnel?.stop().catch(() => {});
+    await direct?.stop().catch(() => {});
+    await relay?.stop().catch(() => {});
+    await lan?.stop().catch(() => {});
+    await upstream.stop().catch(() => {});
   };
 
   ctx.effect(() => () => {
     void shutdown();
   });
 
+  /** Persist startup failures next to the store: the host only has stdout. */
+  const noteFailure = (stage, error) => {
+    const line = `${new Date().toISOString()}\t${stage}\t${error?.stack ?? error}\n`;
+    void appendFile(join(homeDirectory(), 'mobile-bridge-error.log'), line).catch(() => {});
+  };
+
   try {
     await upstream.start();
     lan = new LanBridge({ ctx, upstream, store, config: settings.lan, assets });
     await lan.start().catch((error) => {
       warn(`LAN bridge failed to start: ${error.message}`);
+      noteFailure('lan', error);
     });
     relay = new RelayTunnel({ store, upstream, config: settings.relay });
     if (relay.enabled) relay.start();
@@ -348,6 +355,7 @@ export async function apply(ctx, config) {
     await startClient();
   } catch (error) {
     warn(`mobile bridge failed to start: ${error.message}`);
+    noteFailure('startup', error);
   }
 
   const tools = ctx.get('tools');

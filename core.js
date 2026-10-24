@@ -205,6 +205,18 @@ function rewriteReferer(value, origin) {
   }
 }
 
+const DESKTOP_COOKIE = 'dshmb_desktop';
+
+/**
+ * Desktop controllers (the 远程电脑 direction) ask for the plain DSH UI instead of
+ * the phone layout: their iframe sets this cookie, and cookies ignore ports, so it
+ * reaches the remote bridge through the tunnel without extra plumbing.
+ */
+function wantsDesktopView(cookieHeader) {
+  const raw = String(cookieHeader ?? '');
+  return raw.split(';').some((part) => part.trim().startsWith(`${DESKTOP_COOKIE}=1`));
+}
+
 const PWA_HEAD = [
   '<meta name="theme-color" content="#0b0f14">',
   '<meta name="apple-mobile-web-app-capable" content="yes">',
@@ -238,6 +250,28 @@ export function injectIndex(html) {
  * to the listener's own authority (so the DSH Host/Origin fence accepts them),
  * the owner's signed session cookie is attached, and the response flows back.
  */
+/**
+ * Close a listener without waiting for idle keep-alive sockets. Browsers hold
+ * them open; a stop() that never resolves stalls the loader's reload, leaving
+ * the plugin with its routes registered and no listeners.
+ */
+export async function closeServer(server) {
+  if (server === null || server === undefined) return;
+  await new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    server.once('close', finish);
+    server.close(finish);
+    if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+    const timer = setTimeout(finish, 1500);
+    timer.unref?.();
+  });
+}
+
 export class Upstream {
   constructor(ctx) {
     this.ctx = ctx;
@@ -279,7 +313,7 @@ export class Upstream {
     if (this.server !== null) {
       const server = this.server;
       this.server = null;
-      await new Promise((resolve) => server.close(resolve));
+      await closeServer(server);
     }
     this.agent?.destroy();
   }
@@ -324,6 +358,7 @@ export class Upstream {
       response.end('not found');
       return;
     }
+    request.dshDesktopView = wantsDesktopView(request.headers.cookie);
     await this.forward(request, response, 0);
   }
 
@@ -369,7 +404,7 @@ export class Upstream {
             delete headers['content-length'];
             delete headers['transfer-encoding'];
             delete headers.connection;
-            if (decoded) {
+            if (decoded && !request.dshDesktopView) {
               const body = Buffer.from(injectIndex(raw.toString('utf8')), 'utf8');
               delete headers['content-encoding'];
               headers['content-length'] = String(body.length);

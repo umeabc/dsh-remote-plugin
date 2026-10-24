@@ -8,7 +8,7 @@
  */
 
 import { createServer } from 'node:net';
-import { log, warn } from './core.js';
+import { closeServer, log, warn } from './core.js';
 
 export class LocalProxy {
   constructor(tunnel, port) {
@@ -54,6 +54,6 @@ export class LocalProxy {
     const server = this.server;
     this.server = null;
     if (server === null) return;
-    await new Promise((resolve) => server.close(() => resolve()));
+    await closeServer(server);
   }
 }
