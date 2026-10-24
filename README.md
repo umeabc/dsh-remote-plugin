@@ -1,78 +1,96 @@
-# DSH Remote Plugin
+# dsh-mobile-bridge
 
-> English summary: the desktop (controlled) side of DSH Remote. A DeepSeek Harness Host plugin that
-> pairs a phone over the LAN or keeps an outbound AES-128-GCM tunnel to a relay, serves the DSH web
-> UI to the phone, and injects a phone layout into it.
+把本机的 DeepSeek Harness 桌面端接到手机上。两种通路共用同一套反向代理：
 
-把本机的 DeepSeek Harness 接到手机上的**电脑端插件**。手机端 App 与中转服务器分别在：
+| 通路 | 适用场景 | 手机怎么连 |
+|---|---|---|
+| **同一 Wi-Fi** | 家里 / 办公室，电脑和手机同一网段 | 扫码打开 `http://<电脑IP>:8320/`，输入 6 位配对码 |
+| **中转服务器** | 电脑在内网、手机在外网，电脑不能开公网端口 | 手机 App 扫码，电脑主动连出 AES-128-GCM 加密隧道 |
 
-- 手机客户端：[umeabc/dsh-remote-android](https://github.com/umeabc/dsh-remote-android)
-- 中转服务器：[umeabc/dsh-remote-relay](https://github.com/umeabc/dsh-remote-relay)
-
-```
-Phone App ──TCP+AEAD──▶ Relay ◀──TCP+AEAD── dsh-remote-plugin ──▶ 127.0.0.1:8319 (DSH)
-Phone ──http://电脑IP:8320──▶ 同一 Wi-Fi 直连 ──▶ dsh-remote-plugin ──▶ 127.0.0.1:8319
-```
-
-两种通路共用同一套反向代理；电脑不需要公网 IP、不需要证书，`127.0.0.1:8319` 保持不变。
-
-## 功能
-
-- **局域网配对**：`0.0.0.0:8320` 监听，6 位配对码（10 分钟、用后即换、每 IP 限次），
-  手机浏览器扫码打开；配对后持有 HMAC 签名的 `dshmb` 授权 Cookie。
-- **中转隧道**：主动连出中转、AES-128-GCM 端到端加密、按 `channel/stream` 多路复用，
-  支持多台手机；中转只转发密文帧。
-- **手机布局注入**：只注入给经过插件的页面——对话全宽、侧栏变覆盖抽屉、隐藏桌面挂件、
-  把 DSH 设置页改成顶部标签 + 满宽内容。
-- **设置页**：**设置 → 手机访问**，显示局域网地址/二维码/配对码/设备数、中转地址与连接二维码。
-- **模型工具**：`mobile_access`（status / pair / revoke / relay-reset）。
+两种方式都**不需要**把 DSH 暴露到公网，也不需要改 DSH 的 `--host`。桌面端的 `127.0.0.1:8319` 保持原样。
 
 ## 安装
 
-插件是一个普通 DSH bundle（`package.json` 里的 `dsh.bundle.patch` 指向 `cordis.patch.yml`）。
+插件已经安装到 `desktop` profile。换一台机器时：
 
 ```bash
-# 用 dsh CLI
-dsh plugin --profile desktop add "/path/to/dsh-remote-plugin"
-
-# 或在 Harness 里用 plugin_manager 的 install_bundle，目标填这个目录
+dsh plugin --profile desktop add /path/to/dsh-mobile-bridge
 ```
 
-安装后重载/重启 `mobile-bridge` 行。默认配置在 `cordis.patch.yml`：
+或在 Harness 里用 `plugin_manager` 的 `install_bundle`，目标填这个目录。
 
-```yaml
-- insert:
-    - id: mobile-bridge
-      name: dsh-mobile-bridge
-      config:
-        lan:
-          enabled: true
-          host: 0.0.0.0
-          port: 8320
-        relay:
-          url: ''
-```
-
-`relay.url` 也可以直接在设置页里填，保存后立即重连，不需要改配置文件。
+安装后重启（或让 HMR 重载）插件行 `mobile-bridge`。
 
 ## 使用
 
-1. 打开 **设置 → 手机访问**。
-2. 同一 Wi-Fi：手机扫左侧二维码 → 输入桌面显示的 6 位配对码。
-3. 外网：先在中转服务器上启动 `dsh-remote-relay`，在设置页填 `你的服务器:9443`，
-   状态变「已连接」后，用手机 App 扫右侧二维码（或复制连接码粘贴）。
+打开 **设置 → 手机访问**：
 
-连接码格式（`dshm://`）由中转地址 + 房间 ID + 房间密钥组成，等同于钥匙，不要公开发布。
+- **同一 Wi-Fi**：显示地址、二维码、6 位配对码和已配对设备数。手机扫码 → 输入配对码 → 进入 DSH。首次进入后可在手机浏览器里「添加到主屏幕」。
+- **中转服务器**：填写中转地址（如 `relay.example.com:9443`）并保存，状态变成「已连接」后，手机 App 扫描右侧二维码即可。二维码里是 `dshm://relay?url=…&room=…&key=…` 连接码，也可以「复制连接码」粘贴到 App。
 
-## 局域网与防火墙
+配对码 10 分钟有效、用后即换；每个配对设备可以单独撤销（「全部断开」）。
 
-局域网通路需要在系统防火墙上放行入站 TCP（默认 8320）。Windows：
+## 中转服务器
 
-```powershell
-netsh advfirewall firewall add rule name="DSH Remote (LAN 8320)" dir=in action=allow protocol=TCP localport=8320
+见 [`../dsh-mobile-relay`](../dsh-mobile-relay/README.md)。电脑只发起出站 TCP 连接，所以不需要端口映射、DDNS 或 HTTPS 证书。
+
+## 手机布局
+
+桌面端是「56px 图标栏 + 对话 + 右侧栏」的三栏网格；DSH 自己的窄屏模式在展开时还会把 390px 切成 280/110。手机上看就是挤。
+
+`assets/mobile.css` + `assets/mobile.js` 由 bridge 注入到页面里（`/__mobile/mobile.css`、`/__mobile/mobile.js`），做三件事：
+
+- 对话始终占满整个视口，图标栏改成**覆盖式抽屉**；右上角一个浮动按钮打开会话列表，点会话后自动收起。
+- 隐藏右侧栏入口、余额鲸鱼挂件、输入框下方的 token/速度统计。
+- 对话行高 1.65、聊天区左右留白 12px，正文不再贴边。
+- DSH 设置弹窗改成手机布局：导航列变成顶部横向标签页，内容区占满宽度（原来是 188px + 154px 的桌面分栏）。
+
+这是对桌面 DOM 的适配层，用 `[class*="sidebarCol"]`、`[data-slot="..."]` 这类语义后缀定位；DSH 大版本改结构时可能需要跟着调。桌面浏览器不受影响（只注入给经过 bridge 的页面）。
+
+## 传输优化
+
+- 转发浏览器的 `Accept-Encoding`：上游对 JS/CSS 做 gzip，HTML 需要注入时先在 bridge 里解压。
+- 给 `/plugins/*`、`/assets/*` 的响应补 `Cache-Control: public, max-age=31536000, immutable`（URL 带 `rev`/内容哈希），手机 WebView 第二次启动直接命中缓存。
+- 手机 App 内置了 4.8MB 的壳资源，连 `/assets/*` 都不用过隧道。
+
+## 安全模型
+
+- 桌面端的 DSH 会话 Cookie 只存在于桌面进程内，手机拿到的是独立的 bridge 授权（`dshmb`，HMAC 签名、HttpOnly、30 天）。
+- 局域网监听要求 6 位配对码；每个 IP 10 分钟最多 8 次尝试。
+- 中转通路的载荷用房间密钥派生的 AES-128-GCM 端到端加密，中转服务器只按 `channel/stream` 转发帧，**拿不到密钥、读不到内容**。
+- 连接码（`dshm://…`）等同于钥匙，谁拿到谁就能连；不要发到公开群聊。
+
+## Windows 防火墙
+
+局域网通路需要放行入站 TCP 8320。安装时已添加规则：
+
+```
+DSH Mobile Bridge (LAN 8320)   TCP 8320   入站   域/专用/公用
 ```
 
-不需要时删除同名规则。中转通路是主动出站，不需要任何入站规则。
+不需要时删除：
+
+```powershell
+netsh advfirewall firewall delete rule name="DSH Mobile Bridge (LAN 8320)"
+```
+
+## 配置
+
+`cordis.patch.yml` 里的 `mobile-bridge` 行：
+
+```yaml
+- id: mobile-bridge
+  name: dsh-mobile-bridge
+  config:
+    lan:
+      enabled: true
+      host: 0.0.0.0      # 想只绑某块网卡时填具体 IP
+      port: 8320
+      publicHost: ''      # 覆盖对外展示的主机名（如 Tailscale 名称）
+      sessionDays: 30
+    relay:
+      url: ''             # 中转地址 host:port；设置页里保存的值优先
+```
 
 ## 本机路由
 
@@ -86,37 +104,18 @@ netsh advfirewall firewall add rule name="DSH Remote (LAN 8320)" dir=in action=a
 | `POST /__mobile/devices/clear` | 撤销全部手机授权 |
 | `POST /__mobile/relay/config` | 保存中转地址 `{ "url": "host:port" }` |
 | `POST /__mobile/relay/reset` | 更换房间（room/key） |
-| `GET /__mobile/mobile.css\|mobile.js` | 注入的手机布局资源 |
 
-## 安全模型
-
-- 桌面端的 DSH 会话 Cookie 只存在于电脑进程内；手机拿到的是插件自己签发的 `dshmb` 授权。
-- 局域网：6 位码 + 限次 + 可撤销；每台设备独立。
-- 中转：房间密钥从不发给中转；载荷 AES-128-GCM 端到端加密，中转只能看到帧头。
-- 本机 `/__mobile/*` 接口要求浏览器已登录；局域网侧只公开 manifest/图标/静态布局资源。
-
-## 配置项
-
-| 字段 | 默认 | 说明 |
-|---|---|---|
-| `lan.enabled` | `true` | 是否启动局域网监听 |
-| `lan.host` | `0.0.0.0` | 绑定地址；也可填某个具体网卡 IP |
-| `lan.port` | `8320` | 监听端口 |
-| `lan.publicHost` | `''` | 对外展示的主机名（如 Tailscale 名称） |
-| `lan.sessionDays` | `30` | 手机授权的有效期 |
-| `relay.url` | `''` | 中转地址 `host:port`；设置页保存的值优先 |
-| `relay.enabled` | `true` | 是否允许中转通路 |
+模型侧还有一个 `mobile_access` 工具，`action` 取 `status` / `pair` / `revoke` / `relay-reset`。
 
 ## 自测
 
 ```bash
-node test/lan-e2e.mjs                                   # 配对/Cookie/HTML 注入/WebSocket
-DSH_RELAY_JS=/path/to/dsh-remote-relay/relay.js \
-  node test/relay-e2e.mjs                               # 双手机/未知房间/篡改帧
+node test/lan-e2e.mjs     # 配对、Cookie、HTML 注入、WebSocket
+node test/relay-e2e.mjs   # 中转协议、多手机、篡改拒绝
 ```
 
-`test/relay-e2e.mjs` 需要一个中转 `relay.js`；不设置 `DSH_RELAY_JS` 时会直接跳过。
+## 已知限制
 
-## License
-
-MIT
+- 手机端拿到的是桌面 UI，不是原生界面；390px 宽度下侧栏会收成 56px 图标栏，聊天区可用，但设置面板仍是桌面宽度（横向可滚动）。
+- 只支持一个桌面、多个手机；中转房间同时最多 16 个手机连接。
+- 没有文件选择器/通知/后台常驻（Android 端说明见 `dsh-mobile-android`）。

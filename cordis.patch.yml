@@ -3,7 +3,7 @@
 # `relay` keeps an encrypted outbound tunnel to a relay server (see dsh-mobile-relay).
 - insert:
     - id: mobile-bridge
-      name: dsh-mobile-bridge
+      name: dsh-remote-plugin
       config:
         lan:
           enabled: true
@@ -11,3 +11,5 @@
           port: 8320
         relay:
           url: ''
+        clientLink: ''
+        clientPort: 8331

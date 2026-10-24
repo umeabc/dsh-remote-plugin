@@ -1,9 +1,9 @@
 {
-  "name": "dsh-mobile-bridge",
-  "version": "0.1.0",
+  "name": "dsh-remote-plugin",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
-  "description": "Open this DeepSeek Harness desktop from a phone: LAN pairing or an AES-128-GCM relay tunnel.",
+  "description": "DeepSeek Harness remote access, both directions: serve this desktop to a phone, and drive another desktop from here.",
   "icon": "./icon.svg",
   "exports": {
     ".": "./index.js",
@@ -16,6 +16,8 @@
     "core.js",
     "lan.js",
     "relay.js",
+    "proxy.js",
+    "tunnel.js",
     "direct.js",
     "qr.js",
     "client.js",

@@ -72,9 +72,12 @@ export class DirectServer {
 }
 
 /** Addresses a phone could use to reach this machine directly. */
-export function directCandidates(config) {
+export function directCandidates(config, observedHost) {
   const found = [];
+  // The relay-observed public address works from any network once the router
+  // forwards direct.port; a manually configured host wins.
   if (config?.publicHost) found.push(String(config.publicHost).trim());
+  else if (observedHost) found.push(String(observedHost).trim());
   const seen = new Set(found);
   let v6count = 0;
   // Virtual/VPN adapters are never reachable from a phone; advertising them

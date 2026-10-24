@@ -59,6 +59,7 @@ export class RelayTunnel {
     this.loop = null;
     this.lastRxAt = 0;
     this.backoff = 3000;
+    this.publicHost = '';
   }
 
   get address() {
@@ -172,6 +173,9 @@ export class RelayTunnel {
     if (length === 0 || length > 4096) throw new Error('bad relay reply');
     const reply = JSON.parse((await reader.read(length)).toString('utf8'));
     if (reply?.ok !== true) throw new Error(`relay refused: ${reply?.error ?? 'unknown'}`);
+    if (typeof reply.publicHost === 'string' && reply.publicHost.length > 0) {
+      this.publicHost = reply.publicHost;
+    }
 
     this.connected = true;
     this.lastError = null;

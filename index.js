@@ -24,6 +24,8 @@ import {
 import { LanBridge } from './lan.js';
 import { RelayTunnel } from './relay.js';
 import { DirectServer, directCandidates } from './direct.js';
+import { ClientTunnel } from './tunnel.js';
+import { LocalProxy } from './proxy.js';
 import { qrSvg } from './qr.js';
 
 export const name = 'dsh-mobile-bridge';
@@ -35,7 +37,27 @@ const DEFAULTS = {
   lan: { enabled: true, host: '0.0.0.0', port: 8320, publicHost: '', sessionDays: 30 },
   relay: { enabled: true, url: '' },
   direct: { enabled: true, port: 8330, publicHost: '' },
+  client: { link: '', port: 8331 },
 };
+
+
+/** dshm://relay?url=host:port&room=<hex>&key=<base64url> */
+function parseRemoteLink(text) {
+  const raw = String(text ?? '').trim();
+  if (!/^dshm:\/\//i.test(raw)) return null;
+  let url;
+  try { url = new URL(raw); } catch { return null; }
+  const address = (url.searchParams.get('url') ?? '').trim();
+  const room = (url.searchParams.get('room') ?? '').trim().toLowerCase();
+  const key = (url.searchParams.get('key') ?? '').trim();
+  if (address === '' || !/^[0-9a-f]{16,64}$/.test(room) || key === '') return null;
+  const colon = address.lastIndexOf(':');
+  const host = colon > 0 ? address.slice(0, colon) : address;
+  const port = colon > 0 ? Number(address.slice(colon + 1)) : 9443;
+  const secret = Buffer.from(key.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  if (host === '' || !Number.isInteger(port) || secret.length !== 16) return null;
+  return { host, port, room, key: secret };
+}
 
 function mergeConfig(config) {
   const raw = config ?? {};
@@ -43,6 +65,7 @@ function mergeConfig(config) {
     lan: { ...DEFAULTS.lan, ...(raw.lan ?? {}) },
     relay: { ...DEFAULTS.relay, ...(raw.relay ?? {}) },
     direct: { ...DEFAULTS.direct, ...(raw.direct ?? {}) },
+    client: { link: raw.clientLink ?? '', port: raw.clientPort ?? 8331 },
   };
 }
 
@@ -75,8 +98,34 @@ export async function apply(ctx, config) {
   let lan = null;
   let relay = null;
   let direct = null;
+  let client = null;
+
+
+  /** Start (or restart) the controlling role for the configured remote link. */
+  const startClient = async () => {
+    await client?.proxy?.stop().catch(() => {});
+    await client?.tunnel?.stop().catch(() => {});
+    client = null;
+    const link = String(settings.client.link || store.data.clientLink || '');
+    const parsed = parseRemoteLink(link);
+    if (parsed === null) {
+      if (link !== '') warn('client: invalid link');
+      return;
+    }
+    const tunnel = new ClientTunnel(parsed);
+    const proxy = new LocalProxy(tunnel, Number(settings.client.port) || 8331);
+    await proxy.start().catch((error) => warn(`client proxy: ${error.message}`));
+    tunnel.start();
+    client = { tunnel, proxy, link };
+    log(`client: linked ${parsed.host}:${parsed.port}`);
+  };
 
   const status = () => ({
+    client: {
+      link: client?.link ? client.link.replace(/key=[^&]+/, 'key=***') : (store.data.clientLink ? String(store.data.clientLink).replace(/key=[^&]+/, 'key=***') : null),
+      connected: client?.tunnel?.isConnected === true,
+      url: client?.proxy?.url ?? null,
+    },
     version: VERSION,
     lan: lan?.status() ?? { enabled: settings.lan.enabled !== false, running: false },
     relay: relay?.status() ?? { enabled: false, connected: false },
@@ -120,6 +169,25 @@ export async function apply(ctx, config) {
       enabled: direct !== null && direct.port > 0,
       port: direct?.port ?? 0,
       candidates: direct === null ? [] : directCandidates(settings.direct),
+    });
+  });
+
+
+  route('exact', '/__pc/link', (request, response) => {
+    if (!authorized(request)) return sendText(response, 401, 'unauthorized');
+    if (request.method !== 'POST') return sendText(response, 405, 'POST only');
+    let body = '';
+    request.on('data', (chunk) => {
+      body += chunk;
+      if (body.length > 16 * 1024) request.destroy();
+    });
+    request.on('end', () => {
+      let link = '';
+      try { link = String(JSON.parse(body || '{}').link ?? ''); } catch { return sendText(response, 400, 'bad json'); }
+      if (link !== '' && parseRemoteLink(link) === null) return sendText(response, 400, 'invalid link');
+      store.data.clientLink = link;
+      void store.save().then(() => startClient()).then(() => sendJson(response, 200, status()))
+        .catch((error) => sendText(response, 500, error.message));
     });
   });
 
@@ -213,6 +281,8 @@ export async function apply(ctx, config) {
   const shutdown = async () => {
     if (stopping) return;
     stopping = true;
+    await client?.proxy?.stop().catch(() => {});
+    await client?.tunnel?.stop().catch(() => {});
     await direct?.stop().catch(() => {});
     await relay?.stop().catch(() => {});
     await lan?.stop().catch(() => {});
@@ -244,7 +314,7 @@ export async function apply(ctx, config) {
       : {
           enabled: direct.port > 0,
           port: direct.port,
-          candidates: directCandidates(settings.direct),
+          candidates: directCandidates(settings.direct, relay.publicHost),
         });
     if (settings.direct.enabled !== false && relay.enabled) {
       direct = new DirectServer({ tunnel: relay, config: settings.direct });
@@ -253,6 +323,7 @@ export async function apply(ctx, config) {
         warn(`direct: listener unavailable: ${error.message}`);
       });
     }
+    await startClient();
   } catch (error) {
     warn(`mobile bridge failed to start: ${error.message}`);
   }

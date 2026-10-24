@@ -33,15 +33,34 @@ window.__ModuleLoader__.load({
 .dshmb-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:28px;line-height:34px;letter-spacing:6px;font-weight:600}
 .dshmb-note{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
 .dshmb-actions{display:flex;gap:8px;flex-wrap:wrap}
-.dshmb-btn{appearance:none;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:8px;padding:6px 12px;font-size:12.5px;line-height:18px;cursor:pointer}
+.dshmb-btn{appearance:none;border:1px solid var(--dsw-alias-border-l2,#3c414b);background:var(--dsw-alias-bg-layer-2,#23262c);color:var(--dsw-alias-label-primary,#e8eaed);border-radius:8px;padding:6px 12px;font-size:12.5px;line-height:18px;font-weight:500;cursor:pointer}
 .dshmb-btn:hover{background:var(--dsw-alias-bg-overlay)}
 .dshmb-btn:disabled{opacity:.5;cursor:default}
-.dshmb-btn[data-kind="primary"]{background:var(--dsw-alias-brand-primary);border-color:transparent;color:#fff}
-.dshmb-input{flex:1;min-width:180px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);border-radius:8px;padding:7px 10px;font-size:13px;line-height:18px;outline:none}
+.dshmb-btn[data-kind="primary"]{background:var(--dsw-alias-brand-primary,#4e82e8);border-color:transparent;color:#fff;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.dshmb-btn[data-kind="primary"]:hover{filter:brightness(1.08)}
+.dshmb-input{flex:1;min-width:180px;border:1px solid var(--dsw-alias-border-l2,#3c414b);background:var(--dsw-alias-bg-base,#16181c);color:var(--dsw-alias-label-primary,#e8eaed);border-radius:8px;padding:7px 10px;font-size:13px;line-height:18px;outline:none}
 .dshmb-input:focus{border-color:var(--dsw-alias-brand-primary)}
 .dshmb-error{font-size:12px;line-height:18px;color:var(--dsw-alias-state-error-primary)}
 .dshmb-relayRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 @media (max-width:560px){.dshmb-qr{width:150px;height:150px}}
+
+.dshrp-root{display:flex;flex-direction:column;gap:14px;width:100%;color:var(--dsw-alias-label-primary)}
+.dshrp-lead{margin:0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:20px}
+.dshrp-card{border:1px solid var(--dsw-alias-border-l1);border-radius:14px;background:var(--dsw-alias-bg-layer-1);padding:18px;display:flex;flex-direction:column;gap:12px}
+.dshrp-head{display:flex;align-items:center;gap:8px}
+.dshrp-title{font-size:14px;font-weight:600}
+.dshrp-pill{margin-left:auto;font-size:11.5px;padding:2px 8px;border-radius:999px;border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);display:inline-flex;align-items:center;gap:6px}
+.dshrp-dot{width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-state-idle-primary)}
+.dshrp-dot[data-on="true"]{background:var(--dsw-alias-state-success-primary)}
+.dshrp-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dshrp-input{flex:1;min-width:220px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:ui-monospace,Menlo,Consolas,monospace;outline:none}
+.dshrp-input:focus{border-color:var(--dsw-alias-brand-primary)}
+.dshrp-btn{appearance:none;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer}
+.dshrp-btn[data-kind="primary"]{background:var(--dsw-alias-brand-primary);border-color:transparent;color:#fff}
+.dshrp-btn:disabled{opacity:.5;cursor:default}
+.dshrp-note{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
+.dshrp-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+.dshrp-error{font-size:12px;color:var(--dsw-alias-state-error-primary)}
 `;
 
     const TEXT = {
@@ -131,6 +150,66 @@ window.__ModuleLoader__.load({
     function formatRemaining(ms) {
       const total = Math.max(0, Math.floor(ms / 1000));
       return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+    }
+
+
+    function RemotePcSection() {
+      const [status, setStatus] = React.useState(null);
+      const [link, setLink] = React.useState('');
+      const [busy, setBusy] = React.useState(false);
+      const [error, setError] = React.useState('');
+
+      const refresh = React.useCallback(() => {
+        fetch('/__pc/status', { credentials: 'same-origin' })
+          .then((response) => response.json())
+          .then((value) => setStatus(value.client ?? null))
+          .catch(() => setStatus(null));
+      }, []);
+
+      React.useEffect(() => {
+        refresh();
+        const timer = setInterval(refresh, 4000);
+        return () => clearInterval(timer);
+      }, [refresh]);
+
+      const save = () => {
+        setBusy(true);
+        setError('');
+        fetch('/__pc/link', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ link: link.trim() }),
+        })
+          .then((response) => response.json())
+          .then((value) => { if (value?.error) setError(value.error); else setLink(''); refresh(); })
+          .catch((reason) => setError(String(reason)))
+          .finally(() => setBusy(false));
+      };
+
+      const connected = status?.connected === true;
+      return h('div', { className: 'dshrp-root' },
+        h('p', { className: 'dshrp-lead' },
+          '粘贴另一台电脑「手机访问」里的 dshm:// 连接码，本机就能直接操作那台电脑上的 DSH；任务、模型调用和工具执行都仍在远端运行。'),
+        h('div', { className: 'dshrp-card' },
+          h('div', { className: 'dshrp-head' },
+            h('span', { className: 'dshrp-title' }, '远端连接'),
+            h('span', { className: 'dshrp-pill' },
+              h('span', { className: 'dshrp-dot', 'data-on': connected ? 'true' : 'false' }),
+              connected ? '已连接' : (status?.url ? '连接中…' : '未配置'))),
+          h('div', { className: 'dshrp-row' },
+            h('input', {
+              className: 'dshrp-input',
+              placeholder: 'dshm://relay?url=…&room=…&key=…',
+              value: link,
+              onChange: (event) => setLink(event.target.value),
+            }),
+            h('button', { className: 'dshrp-btn', 'data-kind': 'primary', disabled: busy || link.trim() === '', onClick: save },
+              busy ? '保存中…' : '保存并连接')),
+          status?.url ? h('div', { className: 'dshrp-row' },
+            h('span', { className: 'dshrp-note' }, '本机入口：', h('span', { className: 'dshrp-code' }, status.url)),
+            h('button', { className: 'dshrp-btn', onClick: () => window.open(status.url, '_blank', 'noopener') }, '打开远端界面')) : null,
+          error !== '' ? h('div', { className: 'dshrp-error' }, error) : null));
     }
 
     function createSection(ctx) {
@@ -339,6 +418,13 @@ window.__ModuleLoader__.load({
           order: 17,
           label: () => (languageOf(ctx) === 'zh' ? '手机访问' : 'Phone access'),
         }, Section));
+
+        ctx.slots.inject('settings.section', () => ctx.slots.register({
+          name: 'settings.section',
+          id: 'remote-pc',
+          order: 18,
+          label: () => (languageOf(ctx) === 'zh' ? '远程电脑' : 'Remote PC'),
+        }, RemotePcSection));
       },
     };
   },
