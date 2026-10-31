@@ -6,6 +6,7 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { createServer as createNetServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
@@ -39,9 +40,12 @@ const RELAY_PORT = await new Promise((resolve) => {
     probe.close(() => resolve(chosen));
   });
 });
-const relayPath = process.env.DSH_RELAY_JS ?? '../../dsh-mobile-relay/relay.js';
+// Default next to this checkout (D:/harness/dsh-mobile-relay), resolved from the
+// test file so the path does not depend on the caller's working directory.
+const relayPath = process.env.DSH_RELAY_JS
+  ?? fileURLToPath(new URL('../../dsh-mobile-relay/relay.js', import.meta.url));
 if (!existsSync(relayPath)) {
-  console.log('skip: set DSH_RELAY_JS to the relay.js from umeabc/dsh-remote-relay');
+  console.log(`skip: relay.js not found at ${relayPath}; set DSH_RELAY_JS to its path`);
   process.exit(0);
 }
 const relay = spawn(process.execPath, [relayPath, '--port', String(RELAY_PORT), '--host', '127.0.0.1'], {

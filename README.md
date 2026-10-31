@@ -184,7 +184,8 @@ node test/relay-e2e.mjs   # 中转协议、多手机、篡改拒绝
 node test/pool-e2e.mjs    # 40 条长连接下普通请求不被饿死、关页面即释放上游
 ```
 
-`relay-e2e` 需要中转实现，默认跳过：`DSH_RELAY_JS=/d/harness/dsh-mobile-relay/relay.js node test/relay-e2e.mjs`。
+`relay-e2e` 默认用同级目录的 `../dsh-mobile-relay/relay.js`（从测试文件解析，和当前工作目录无关）；
+放到别处时用 `DSH_RELAY_JS=/path/to/relay.js` 指过去，找不到就跳过。
 
 宿主半侧可以脱离 DSH 单独冒烟：用假的 `ctx`（`webServer.register` / `connection.admit` / `get('tools')`）
 import `index.js` 再 `apply(ctx, config)`，检查路由表与 8320 监听是否起来。
