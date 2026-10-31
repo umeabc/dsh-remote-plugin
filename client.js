@@ -354,14 +354,21 @@ window.__ModuleLoader__.load({
         const connected = status?.connected === true;
         const url = status?.url ?? '';
         const host = status?.host ?? '';
+        // A link stays configured while the tunnel redials, and the first status
+        // right after POST /__pc/link arrives before the handshake finishes, so
+        // `connected` cannot decide whether the view should stay: only a cleared
+        // link can. `known` keeps the first render (no answer yet) from counting
+        // as "no link" and dropping a remembered takeover.
+        const configured = (status?.link ?? '') !== '';
+        const known = status !== null;
 
         // A reload while the takeover is remembered re-enters it; once the link is
         // gone the overlay is not allowed to outlive the connection.
         React.useEffect(() => {
           if (window.top !== window.self) return;
           if (connected && url !== '' && readTakeoverUrl() !== '') enterTakeover(url, host, r, refresh);
-          if (!connected && readTakeoverUrl() !== '') leaveTakeover();
-        }, [connected, url, host]);
+          if (known && !configured && readTakeoverUrl() !== '') leaveTakeover();
+        }, [connected, url, host, configured, known]);
 
         const save = () => {
           setBusy(true);
@@ -381,7 +388,13 @@ window.__ModuleLoader__.load({
               setLink('');
               const next = value?.client ?? null;
               setStatus(next);
-              if (next?.url) enterTakeover(next.url, next.host ?? '', r, refresh);
+              if (next?.url) {
+                // Record the intent before mounting: the tunnel is usually still
+                // handshaking here, and the effect above enters the view as soon
+                // as it reports connected.
+                writeTakeoverUrl(next.url);
+                if (next.connected === true) enterTakeover(next.url, next.host ?? '', r, refresh);
+              }
             })
             .catch((reason) => setError(String(reason)))
             .finally(() => setBusy(false));

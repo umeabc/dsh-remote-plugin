@@ -31,7 +31,7 @@ import { qrSvg } from './qr.js';
 export const name = 'dsh-remote-plugin';
 export const inject = ['webServer', 'connection'];
 
-const VERSION = '0.2.1';
+const VERSION = '0.2.2';
 
 const DEFAULTS = {
   lan: { enabled: true, host: '0.0.0.0', port: 8320, publicHost: '', sessionDays: 30 },

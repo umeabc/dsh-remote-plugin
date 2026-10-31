@@ -10,6 +10,26 @@
 
 两种方式都**不需要**把 DSH 暴露到公网，也不需要改 DSH 的 `--host`。
 
+## 兼容性
+
+| 插件 | DSH 桌面端 | 状态 |
+|---|---|---|
+| 0.2.2 | **0.2.1-rc.5**（host protocol v4） | 当前目标版本 |
+| 0.2.1 | 0.2.1-rc.3 | 已验证（见 `docs/2026-10-24-*`） |
+| 0.1.x | 0.1.x | 旧版，设置页 token 已不适用 |
+
+宿主半侧只用三样东西：`ctx.webServer.register` / `getOrigin`、`ctx.connection.admit` /
+`authenticatedUrl`、`ctx.get('tools')`；客户端半侧只注册 `slots` 的 `settings.section` 与
+`settings.section` 条目。0.2.1 里这些签名都没变，**但界面侧有三处行为变了**，0.2.2 跟着改了：
+
+- 会话头右上角新增「… 更多操作 / 在文件管理器打开」，和悬浮会话列表按钮抢同一块地方；
+- 输入框下方新增一条运行统计（轮数 / tok·s / 缓存命中 / 上下文），手机上挤占输入框高度；
+- 窗口接管原来以 `connected` 判断是否退出，连接还在握手时会被误判。见
+  [`docs/2026-10-31-dsh-0.2.1-compat.md`](docs/2026-10-31-dsh-0.2.1-compat.md)。
+
+升级宿主半侧（`index.js` / `core.js`）必须**重启 DSH**；`client.js`、`assets/` 由 bridge 现读现发，
+刷新手机页面即可。
+
 ## 安装
 
 插件已作为 `link:` 依赖装在 `desktop` profile 里（`dsh.profile.bundles` 也要有它）：
@@ -75,7 +95,9 @@ HMR 打开时改动即时生效，否则重启 DSH。
 `assets/mobile.css` + `assets/mobile.js` 由 bridge 注入到页面里（`/__mobile/mobile.css`、`/__mobile/mobile.js`），做四件事：
 
 - 对话始终占满整个视口，图标栏改成**覆盖式抽屉**；右上角一个浮动按钮打开会话列表，点会话后自动收起。
-- 隐藏右侧栏入口、余额鲸鱼挂件、输入框下方的 token/速度统计。
+  会话头右侧给这个按钮留出 64px，DSH 0.2 的「… 更多操作」不会再被压在下面。
+- 隐藏右侧栏入口、余额鲸鱼挂件、输入框下方的运行统计（`[data-slot="conversation.composer.dock"]`，
+  0.2 起是轮数 / tok·s / 缓存命中 / 上下文那一行）。
 - 对话行高 1.65、聊天区左右留白 12px，正文不再贴边。
 - DSH 设置弹窗改成手机布局：导航列变成顶部横向标签页，内容区占满宽度。
 
@@ -86,6 +108,10 @@ HMR 打开时改动即时生效，否则重启 DSH。
 - 转发浏览器的 `Accept-Encoding`：上游对 JS/CSS 做 gzip，HTML 需要注入时先在 bridge 里解压。
 - 给 `/plugins/*`、`/assets/*` 的响应补 `Cache-Control: public, max-age=31536000, immutable`（URL 带 `rev`/内容哈希），手机 WebView 第二次启动直接命中缓存。
 - 手机 App 内置了 4.8MB 的壳资源，连 `/assets/*` 都不用过隧道。
+- 上游连接池**不设并发上限**（只限制空闲 socket 数）：手机的每个页面都会长期占住一条
+  DSH 的 `/plugins/events`（客户端 HMR 的 SSE 通道），固定 32 条的老池子在十几二十次打开之后
+  就会让整个 bridge 排队卡死。页面关掉时 bridge 会同步销毁对应的上游请求，不会再留死连接。
+  `test/pool-e2e.mjs` 盯着这条。
 
 ## 安全模型
 
@@ -152,7 +178,10 @@ netsh advfirewall firewall delete rule name="DSH Mobile Bridge (LAN 8320)"
 ```bash
 node test/lan-e2e.mjs     # 配对、Cookie、HTML 注入、WebSocket
 node test/relay-e2e.mjs   # 中转协议、多手机、篡改拒绝
+node test/pool-e2e.mjs    # 40 条长连接下普通请求不被饿死、关页面即释放上游
 ```
+
+`relay-e2e` 需要中转实现，默认跳过：`DSH_RELAY_JS=/d/harness/dsh-mobile-relay/relay.js node test/relay-e2e.mjs`。
 
 宿主半侧可以脱离 DSH 单独冒烟：用假的 `ctx`（`webServer.register` / `connection.admit` / `get('tools')`）
 import `index.js` 再 `apply(ctx, config)`，检查路由表与 8320 监听是否起来。
@@ -173,4 +202,6 @@ node preview/serve.mjs 4599   # http://127.0.0.1:4599/?theme=dark
 ```
 
 改完样式与暗色对比度实测见 [`docs/2026-10-24-contrast-and-boot-fix.md`](docs/2026-10-24-contrast-and-boot-fix.md)；
-「接管整个窗口」的实现与限制见 [`docs/2026-10-24-takeover.md`](docs/2026-10-24-takeover.md)。
+「接管整个窗口」的实现与限制见 [`docs/2026-10-24-takeover.md`](docs/2026-10-24-takeover.md)；
+DSH 0.2.1-rc.5 的适配记录（含连接池卡死的复现）见
+[`docs/2026-10-31-dsh-0.2.1-compat.md`](docs/2026-10-31-dsh-0.2.1-compat.md)。

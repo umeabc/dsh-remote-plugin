@@ -287,7 +287,12 @@ export class Upstream {
   async start() {
     this.origin = this.ctx.webServer.getOrigin();
     this.authority = new URL(this.origin).host;
-    this.agent = new Agent({ keepAlive: true, maxSockets: 32 });
+    // A phone page holds one long-lived /plugins/events stream (DSH's client HMR
+    // channel) for as long as it is open, so a fixed pool of 32 sockets starves
+    // every ordinary request after a few dozen page loads. Keep concurrency
+    // unbounded and bound only the idle sockets: the browser's own connection
+    // limit is the real ceiling.
+    this.agent = new Agent({ keepAlive: true, maxSockets: Infinity, maxFreeSockets: 64 });
     // allowHalfOpen keeps the response writable after a tunnel stream sends FIN
     // for its request side; without it Node ends the socket before we answer.
     this.server = createServer({ allowHalfOpen: true }, (request, response) => {
@@ -448,6 +453,13 @@ export class Upstream {
           response.destroy();
         }
         resolve();
+      });
+      // The phone closed the tab or navigated away mid-response: release the
+      // upstream half too. Without this a long-lived stream keeps its socket
+      // allocated with nobody reading it, and enough abandoned pages wedge the
+      // pool for every later request.
+      response.on('close', () => {
+        if (!response.writableEnded) upstream.destroy();
       });
       request.pipe(upstream);
     });
