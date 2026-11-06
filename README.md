@@ -12,40 +12,12 @@
 
 ## 兼容性
 
-| 插件 | DSH 桌面端 | 状态 |
-|---|---|---|
-| 0.2.4 | **0.2.2-rc.1**（host protocol v4） | 当前目标版本 |
-| 0.2.3 | 0.2.2-rc.1 | 已验证 |
-| 0.2.2 | 0.2.1-rc.5 | 已验证 |
-| 0.2.1 | 0.2.1-rc.3 | 已验证（见 `docs/2026-10-24-*`） |
-| 0.1.x | 0.1.x | 旧版，设置页 token 已不适用 |
+需要 **DSH 桌面端 0.2.x**（宿主协议 v4，已在 0.2.2-rc.1 上验证）。升级插件时：
+`index.js` / `core.js` 改动必须**重启 DSH**；`client.js` 与 `assets/` 由 bridge 现读现发，
+刷新手机页面即可。逐版本记录见 [`CHANGELOG.md`](CHANGELOG.md)。
 
-宿主半侧只用三样东西：`ctx.webServer.register` / `getOrigin`、`ctx.connection.admit` /
-`authenticatedUrl`、`ctx.get('tools')`；客户端半侧只注册 `slots` 的 `settings.section` 与
-`settings.section` 条目。0.2.1 和 0.2.2 里这些签名都没变，变的是**界面结构**（0.2.2 的四处改动见
-[`docs/2026-11-06-dsh-0.2.2-compat.md`](docs/2026-11-06-dsh-0.2.2-compat.md)）。0.2.1 那轮的改动：
-
-- 会话头右上角新增「… 更多操作 / 在文件管理器打开」，和悬浮会话列表按钮抢同一块地方（0.2.2 给它留了 64px）；
-- 输入框下方新增一条运行统计（轮数 / tok·s / 缓存命中 / 上下文），手机上挤占输入框高度（0.2.2 隐藏）；
-- 窗口接管原来以 `connected` 判断是否退出，连接还在握手时会被误判（0.2.2 改按连接码判断）；
-- 手机每个页面都会长期占住一条 `/plugins/events`（客户端 HMR 的 SSE），固定 32 条的上游连接池
-  十几二十次打开之后会把整个 bridge 卡死（0.2.2 去掉并发上限，并在页面关闭时释放上游）。
-
-以上细节与重启后的复核数据见 [`docs/2026-10-31-dsh-0.2.1-compat.md`](docs/2026-10-31-dsh-0.2.1-compat.md)。
-
-0.2.2 这一轮修的四件事（会话被挤成三分之一、设置弹窗被自己的兼容层改坏、会话头被新按钮挤没、
-运行统计换了位置）见 [`docs/2026-11-06-dsh-0.2.2-compat.md`](docs/2026-11-06-dsh-0.2.2-compat.md)。
-
-0.2.4 修的是抽屉状态：点侧栏的「新会话」后，DSH 自己收起了侧栏而我们的标记没跟着变，
-导致两颗悬浮按钮消失、一层遮罩压在页面上（也就是「背景色不同」）。现在按 DSH 的真实侧栏状态同步，
-见 [`docs/2026-11-07-drawer-state-sync.md`](docs/2026-11-07-drawer-state-sync.md)。
-
-0.2.5 是界面收敛：去掉我们自己的两颗悬浮按钮（左侧已能开抽屉，断开连接移进 App 顶栏刷新按钮旁边），
-并把运行统计放回手机（去掉「N 轮 N 步」），见
-[`docs/2026-11-07-simpler-chrome.md`](docs/2026-11-07-simpler-chrome.md)。
-
-升级宿主半侧（`index.js` / `core.js`）必须**重启 DSH**；`client.js`、`assets/` 由 bridge 现读现发，
-刷新手机页面即可。
+> **不要和旧的 `dsh-mobile-bridge`（0.1.0）同时启用**：两者的设置页工厂都注册在同一个浏览器
+> 模块表里，同时加载会报 `duplicate factory registration`，整个 Web 前端起不来。
 
 ## 安装
 
@@ -58,12 +30,6 @@ dsh plugin --profile desktop add link:D:/harness/dsh-remote-plugin
 `dsh plugin` 会把包加进依赖；profile 的 `package.json` 里 `dsh.profile.bundles` 需要包含
 `dsh-remote-plugin`，bundle 的 patch（`cordis.patch.yml` 的 `mobile-bridge` 行）才会被应用。
 HMR 打开时改动即时生效，否则重启 DSH。
-
-> **不要和旧的 `dsh-mobile-bridge`（0.1.0）同时启用。** 两者的设置页工厂都注册在浏览器模块表里，
-> 且旧版客户端把工厂 id 写死成 `dsh-mobile-bridge`；同时加载会报
-> `duplicate factory registration`，并让整个 web boot 起不来。
-> 本版工厂 id 已改为 `dsh-remote-plugin`，与包名一致——客户端模块 id **必须**等于包名，
-> 否则入口报 `loaded without registering "<id>"`。
 
 ## 使用
 
@@ -88,18 +54,11 @@ HMR 打开时改动即时生效，否则重启 DSH。
 
 配对码 10 分钟有效、用后即换；「全部断开」撤销全部手机授权。
 
-## 设置页样式（0.2.x）
+## 设置页样式
 
-设置页的样式全部用 DSH 的设计 token，没有硬编码颜色，因此跟随明暗主题：
-
-- 主按钮：`--dsw-alias-button-primary-fill` / `--dsw-alias-button-primary-hover`，
-  文字用 `--dsw-alias-label-primary-foreground`。
-  暗色主题下 `--dsw-alias-brand-primary` 是**近白色**（`#f9fafb`），直接配 `color:#fff`
-  会得到 1.05:1 的对比度（肉眼等于空白），这就是 0.1.0 暗色下按钮「看不见字」的原因。
-- 次级按钮：`--dsw-alias-bg-layer-2` + `--dsw-alias-border-l2`，hover 用 `--dsw-alias-interactive-bg-hover`。
-- 输入框：`--dsw-alias-bg-base` 底 + `--dsw-alias-border-l2` 边；聚焦换成 `--dsw-alias-button-info-fill`。
-- 二维码底板**故意**保持纯白（扫码需要亮底色），另加一条 `--dsw-alias-border-l2` 描边，
-  免得在暗色卡片上像一块发光方块。
+样式全部用 DSH 的设计 token，没有硬编码颜色，因此跟随明暗主题：主按钮用
+`--dsw-alias-button-primary-fill` / `--dsw-alias-label-primary-foreground`，次级按钮用
+`--dsw-alias-bg-layer-2` + `--dsw-alias-border-l2`。二维码底板保持纯白（扫码需要亮底色）并加描边。
 
 ## 中转服务器
 
@@ -209,7 +168,7 @@ import `index.js` 再 `apply(ctx, config)`，检查路由表与 8320 监听是�
 
 - 手机端拿到的是桌面 UI，不是原生界面；390px 宽度下侧栏会收成 56px 图标栏，聊天区可用。
 - 只支持一个桌面、多个手机；中转房间同时最多 16 个手机连接。
-- 没有文件选择器/通知/后台常驻（Android 端说明见 `dsh-mobile-android`）。
+- 手机端的历史版本说明见 `dsh-mobile-android`（原生 App，本插件是它的服务端）。
 
 ## 预览
 
@@ -220,7 +179,5 @@ node preview/extract-theme.mjs "D:/dsh/resources/app.asar"
 node preview/serve.mjs 4599   # http://127.0.0.1:4599/?theme=dark
 ```
 
-改完样式与暗色对比度实测见 [`docs/2026-10-24-contrast-and-boot-fix.md`](docs/2026-10-24-contrast-and-boot-fix.md)；
 「接管整个窗口」的实现与限制见 [`docs/2026-10-24-takeover.md`](docs/2026-10-24-takeover.md)；
-DSH 0.2.1-rc.5 的适配记录（含连接池卡死的复现）见
-[`docs/2026-10-31-dsh-0.2.1-compat.md`](docs/2026-10-31-dsh-0.2.1-compat.md)。
+逐版本的适配记录与实测数据见 [`CHANGELOG.md`](CHANGELOG.md) 与 `docs/`。
