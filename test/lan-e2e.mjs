@@ -4,9 +4,9 @@
  * without booting a Harness.
  */
 
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
-import { zstdCompressSync } from 'node:zlib';
+import { gunzipSync, gzipSync, zstdCompressSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { Store, Upstream } from '../core.js';
 import { LanBridge } from '../lan.js';
@@ -42,6 +42,18 @@ const upstreamServer = createServer((request, response) => {
     }
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     response.end('<!doctype html><html><head><link rel="manifest" href="./manifest.webmanifest"><title>DSH</title></head><body>ok</body></html>');
+    return;
+  }
+  if (url.pathname === '/gz') {
+    const body = gzipSync(Buffer.from(
+      '<!doctype html><html><head><link rel="manifest" href="./manifest.webmanifest"></head><body>gzip</body></html>',
+    ));
+    response.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'content-encoding': 'gzip',
+      'content-length': String(body.length),
+    });
+    response.end(body);
     return;
   }
   if (url.pathname === '/zst') {
@@ -144,6 +156,40 @@ check(
   'zstd page injected, not passed through',
   zst.status === 200 && zstHtml.includes('/__mobile/manifest.webmanifest') && zst.headers.get('content-encoding') === null,
   `encoding=${zst.headers.get('content-encoding')} len=${zstHtml.length}`,
+);
+
+// 5c. A desktop controller asks for the shell untouched: the compressed bytes
+// must arrive still compressed under the header that describes them. (The phone
+// path decodes for injection; the desktop path must not, or the iframe gets
+// plain text labelled gzip.)
+// fetch() transparently un-gzips, so read the wire bytes with a raw request.
+const desktop = await new Promise((resolve, reject) => {
+  const request = httpRequest({
+    host: '127.0.0.1',
+    port: lan.port,
+    path: '/gz',
+    headers: { cookie: `${cookie}; dshmb_desktop=1` },
+  }, (response) => {
+    const chunks = [];
+    response.on('data', (chunk) => chunks.push(chunk));
+    response.on('end', () => resolve({ status: response.statusCode, headers: response.headers, body: Buffer.concat(chunks) }));
+  });
+  request.on('error', reject);
+  request.end();
+});
+let desktopDecoded = '';
+try {
+  desktopDecoded = gunzipSync(desktop.body).toString('utf8');
+} catch (error) {
+  desktopDecoded = `gunzip failed: ${error.code ?? error.message}`;
+}
+check(
+  'desktop view gets the page still gzip-encoded',
+  desktop.status === 200
+    && desktop.headers['content-encoding'] === 'gzip'
+    && desktopDecoded.includes('gzip</body>')
+    && !desktopDecoded.includes('/__mobile/manifest.webmanifest'),
+  `encoding=${desktop.headers['content-encoding']} gunzip=${desktopDecoded.slice(0, 40)}`,
 );
 
 // 6. Other paths are proxied verbatim.

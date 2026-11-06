@@ -185,7 +185,7 @@ netsh advfirewall firewall delete rule name="DSH Mobile Bridge (LAN 8320)"
 ## 自测
 
 ```bash
-node test/lan-e2e.mjs     # 配对、Cookie、HTML 注入、WebSocket
+node test/lan-e2e.mjs     # 配对、Cookie、HTML 注入（含 zstd / 桌面视图压缩透传）、WebSocket
 node test/relay-e2e.mjs   # 中转协议、多手机、篡改拒绝
 node test/pool-e2e.mjs    # 40 条长连接下普通请求不被饿死、关页面即释放上游
 ```

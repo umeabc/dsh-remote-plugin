@@ -90,11 +90,11 @@ html[data-dshm-mobile='1'] [data-slot='conversation.header'] header {
   padding-right: 64px !important;
 }
 
-/* Phone-irrelevant desktop affordances in the session header. The file-manager
-   button opens the *desktop's* Explorer, so it is only an icon button with an
-   aria-label to go by. */
-html[data-dshm-mobile='1'] [data-slot='conversation.header'] button[aria-label*='文件资源管理器'],
-html[data-dshm-mobile='1'] [data-slot='conversation.header'] button[aria-label*='file manager'] {
+/* Phone-irrelevant desktop affordances in the session header. "Open in …"
+   launches the *desktop's* file manager, which means nothing on a phone; its
+   wrapper carries data-open-target, so this works in every language instead of
+   matching the localized label (zh "文件资源管理器", en "File Explorer", …). */
+html[data-dshm-mobile='1'] [data-slot='conversation.header'] [data-open-target] {
   display: none !important;
 }
 

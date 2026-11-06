@@ -397,34 +397,38 @@ export class Upstream {
             .then(resolve);
           return;
         }
+        // Only the phone view needs the page rewritten; a desktop controller asks
+        // for the shell byte-for-byte, so it takes the pass-through path below
+        // instead of being decoded and re-sent under its original encoding.
         const type = String(incoming.headers['content-type'] ?? '');
-        if (type.includes('text/html')) {
+        if (type.includes('text/html') && !request.dshDesktopView) {
           const chunks = [];
           incoming.on('data', (chunk) => chunks.push(chunk));
           incoming.on('end', () => {
-            let raw = Buffer.concat(chunks);
-            let decoded = true;
+            let raw;
             try {
-              raw = decompress(raw, incoming.headers['content-encoding']);
+              raw = decompress(Buffer.concat(chunks), incoming.headers['content-encoding']);
             } catch {
-              decoded = false;
+              // Unknown or mislabelled encoding: hand the bytes back untouched
+              // (encoding and length intact) rather than corrupting the page.
+              raw = Buffer.concat(chunks);
+              const headers = { ...incoming.headers };
+              delete headers.connection;
+              delete headers['transfer-encoding'];
+              response.writeHead(incoming.statusCode ?? 200, headers);
+              response.end(raw);
+              resolve();
+              return;
             }
+            const body = Buffer.from(injectIndex(raw.toString('utf8')), 'utf8');
             const headers = { ...incoming.headers };
             delete headers['content-length'];
             delete headers['transfer-encoding'];
             delete headers.connection;
-            if (decoded && !request.dshDesktopView) {
-              const body = Buffer.from(injectIndex(raw.toString('utf8')), 'utf8');
-              delete headers['content-encoding'];
-              headers['content-length'] = String(body.length);
-              response.writeHead(incoming.statusCode ?? 200, headers);
-              response.end(body);
-            } else {
-              // Unknown encoding: pass the bytes through untouched rather than
-              // corrupting the page.
-              response.writeHead(incoming.statusCode ?? 200, headers);
-              response.end(raw);
-            }
+            delete headers['content-encoding'];
+            headers['content-length'] = String(body.length);
+            response.writeHead(incoming.statusCode ?? 200, headers);
+            response.end(body);
             resolve();
           });
           incoming.on('error', () => {
