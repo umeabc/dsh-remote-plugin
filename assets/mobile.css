@@ -59,37 +59,6 @@ html[data-dshm-mobile='1'] .dshm-scrim {
   background: rgba(15, 23, 42, 0.36);
 }
 
-html[data-dshm-mobile='1'] .dshm-rail-button {
-  position: fixed;
-  right: 12px;
-  top: calc(10px + env(safe-area-inset-top, 0px));
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  border-radius: 12px;
-  border: 1px solid #e2e5e9;
-  background: rgba(255, 255, 255, 0.94);
-  color: #224665;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
-}
-
-html[data-dshm-mobile='1'][data-dshm-rail='1'] .dshm-rail-button {
-  display: none;
-}
-
-/* The drawer button floats over the top-right corner, which is exactly where
-   DSH 0.2 puts the session utilities (the … menu, "open in file manager"). The
-   header's own padding-right is 28px and the utilities cluster pulls 16px back
-   with a negative margin, so the buttons end 12px from the edge - underneath a
-   38px floating button that sits 12px from it. Reserve the strip instead. */
-html[data-dshm-mobile='1'] [data-slot='conversation.header'] header {
-  padding-right: 64px !important;
-}
-
 /* Phone-irrelevant desktop affordances in the session header. "Open in …"
    launches the *desktop's* file manager, which means nothing on a phone; its
    wrapper carries data-open-target, so this works in every language instead of
@@ -104,29 +73,6 @@ html[data-dshm-mobile='1'] [data-slot='conversation.header'] [data-open-target] 
    label, and gives the session title its width back. */
 html[data-dshm-mobile='1'] [data-slot='conversation.header'] [class*='titleCluster'] button {
   display: none !important;
-}
-
-/* Disconnect sits directly under the session-list button. */
-html[data-dshm-mobile='1'] .dshm-power-button {
-  position: fixed;
-  right: 12px;
-  top: calc(56px + env(safe-area-inset-top, 0px));
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  border-radius: 12px;
-  border: 1px solid #e2e5e9;
-  background: rgba(255, 255, 255, 0.94);
-  color: #c84c4c;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
-}
-
-html[data-dshm-mobile='1'][data-dshm-rail='1'] .dshm-power-button {
-  display: none;
 }
 
 /* DSH's settings dialog is a 342px card with a 188px nav column, which leaves
@@ -186,14 +132,30 @@ html[data-dshm-mobile='1'] .dshwv-menu {
   display: none !important;
 }
 
-/* DSH 0.2 pins a run-statistics dock under the composer (turns, steps, tok/s,
-   cache hit rate, context use). It is a desktop diagnostic; on a phone it only
-   steals height from the composer and clips its own labels, so it stays on the
-   desktop. The slot name survives DSH's CSS-module renames; 0.2.2 moved the
-   same row inside the composer bar, so cover both spellings. */
+/* The run statistics stay visible on a phone - token speed, tokens used and
+   the context percentage are what people actually watch - but the row is long,
+   so keep it to one scrollable line instead of letting it wrap into the
+   composer. mobile.js also trims the "N 轮 N 步" prefix from the speed pill. */
 html[data-dshm-mobile='1'] [data-slot='conversation.composer.dock'],
 html[data-dshm-mobile='1'] [data-slot='conversation.composer.bar'] [class*='_dock'] {
-  display: none !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-start !important;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+
+html[data-dshm-mobile='1'] [data-slot='conversation.composer.bar'] [class*='_dock']::-webkit-scrollbar {
+  display: none;
+}
+
+html[data-dshm-mobile='1'] [data-slot='conversation.composer.bar'] [class*='_dock'] > * {
+  flex: none;
 }
 
 /* The conversation is the product: comfortable line height, and a header that

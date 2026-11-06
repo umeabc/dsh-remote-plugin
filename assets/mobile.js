@@ -11,9 +11,7 @@
   'use strict';
 
   var HTML = document.documentElement;
-  var drawer = null;
   var scrim = null;
-  var power = null;
 
   function isOpen() {
     return HTML.getAttribute('data-dshm-rail') === '1';
@@ -38,11 +36,6 @@
     HTML.removeAttribute('data-dshm-rail');
     if (scrim !== null) scrim.style.display = 'none';
     dshToggle(false);
-  }
-
-  function toggleDrawer() {
-    if (isOpen()) closeDrawer();
-    else openDrawer();
   }
 
   /** True while DSH's own sidebar is expanded (its toggle offers "collapse"). */
@@ -72,10 +65,6 @@
     }
   }
 
-  function isAppOrigin() {
-    return location.hostname === '127.0.0.1' || location.hostname === 'localhost';
-  }
-
   function buildChrome() {
     if (scrim === null) {
       scrim = document.createElement('div');
@@ -83,33 +72,29 @@
       scrim.addEventListener('click', closeDrawer);
       document.body.appendChild(scrim);
     }
-    if (drawer === null) {
-      drawer = document.createElement('button');
-      drawer.type = 'button';
-      drawer.className = 'dshm-rail-button';
-      drawer.setAttribute('aria-label', '会话列表');
-      drawer.innerHTML =
-        '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">'
-        + '<path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
-        + '</svg>';
-      drawer.addEventListener('click', toggleDrawer);
-      document.body.appendChild(drawer);
-    }
-    if (isAppOrigin() && power === null) {
-      power = document.createElement('button');
-      power.type = 'button';
-      power.className = 'dshm-power-button';
-      power.setAttribute('aria-label', '断开连接');
-      power.innerHTML =
-        '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">'
-        + '<path d="M12 3v9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>'
-        + '<path d="M6.6 6.6a8 8 0 1 0 10.8 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>'
-        + '</svg>';
-      power.addEventListener('click', function () {
-        window.location.href = 'dshm://disconnect';
-      });
-      document.body.appendChild(power);
-    }
+    // No floating buttons of our own any more: the shell already draws a
+    // sidebar toggle in the top-left leading seat, and the app's own top bar
+    // carries the disconnect action next to refresh.
+  }
+
+  /**
+   * "13 轮 755 步 · 175 tok/s" is three pieces of information in one pill; on a
+   * phone the turn and step counts are noise, the speed is not. Rewrite the
+   * label down to the speed, and drop the separator that would trail it.
+   */
+  function trimActivityLabels() {
+    var labels = document.querySelectorAll('[data-composer-stat="activity"] [class*="_label"]');
+    Array.prototype.forEach.call(labels, function (label) {
+      var separator = label.querySelector('[class*="_sep"]');
+      if (separator === null) return;
+      var node = label.firstChild;
+      while (node !== null && node !== separator) {
+        var next = node.nextSibling;
+        label.removeChild(node);
+        node = next;
+      }
+      label.removeChild(separator);
+    });
   }
 
   /**
@@ -148,6 +133,7 @@
   function mark() {
     if (HTML.getAttribute('data-dshm-mobile') !== '1') HTML.setAttribute('data-dshm-mobile', '1');
     syncDrawer();
+    trimActivityLabels();
     markSettings();
 
     var sidebar = document.querySelector('[class*="sidebarCol"]');
