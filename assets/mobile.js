@@ -85,14 +85,32 @@
     }
   }
 
+  /**
+   * Old DSH builds render the settings dialog as an 800px grid with a 188px nav
+   * column even on a phone, which leaves ~150px of content. From 0.2.2 the
+   * dialog styles itself for narrow screens (full-bleed, nav as a horizontal
+   * strip), and forcing our own column layout on top of that grid strands the
+   * title in a stretched cell. So only mark the panel when it is still the
+   * desktop-sized dialog.
+   */
   function markSettings() {
     var navList = document.querySelector('[class*="navList"]');
     if (navList === null) return;
     var nav = navList.closest('nav') || navList.parentElement;
     var panel = nav === null ? null : nav.parentElement;
-    navList.setAttribute('data-dshm-settings-navlist', '');
-    if (nav !== null) nav.setAttribute('data-dshm-settings-nav', '');
     if (panel === null) return;
+    // Zero width means the dialog is still hidden or animating in; measuring
+    // then would mark it and never re-check. Wait for a real frame.
+    var width = panel.getBoundingClientRect().width;
+    if (width === 0) return;
+    if (width >= window.innerWidth - 8) {
+      panel.removeAttribute('data-dshm-settings-panel');
+      nav.removeAttribute('data-dshm-settings-nav');
+      navList.removeAttribute('data-dshm-settings-navlist');
+      return;
+    }
+    navList.setAttribute('data-dshm-settings-navlist', '');
+    nav.setAttribute('data-dshm-settings-nav', '');
     panel.setAttribute('data-dshm-settings-panel', '');
     var content = Array.prototype.slice.call(panel.children).filter(function (child) {
       return child !== nav;

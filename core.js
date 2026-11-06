@@ -4,7 +4,7 @@
  */
 
 import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto';
-import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib';
+import { brotliDecompressSync, gunzipSync, inflateSync, zstdDecompressSync } from 'node:zlib';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { Agent, createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
@@ -190,6 +190,10 @@ function decompress(buffer, encoding) {
   if (value === 'gzip' || value === 'x-gzip') return gunzipSync(buffer);
   if (value === 'deflate') return inflateSync(buffer);
   if (value === 'br') return brotliDecompressSync(buffer);
+  // Chrome advertises zstd from 123 on, and DSH's web server picks whatever the
+  // request allows; without this the index would pass through un-injected and
+  // the phone would get the desktop shell.
+  if (value === 'zstd') return zstdDecompressSync(buffer);
   throw new Error(`unsupported content-encoding: ${value}`);
 }
 

@@ -6,6 +6,7 @@
 
 import { createServer } from 'node:http';
 import { connect } from 'node:net';
+import { zstdCompressSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { Store, Upstream } from '../core.js';
 import { LanBridge } from '../lan.js';
@@ -41,6 +42,20 @@ const upstreamServer = createServer((request, response) => {
     }
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     response.end('<!doctype html><html><head><link rel="manifest" href="./manifest.webmanifest"><title>DSH</title></head><body>ok</body></html>');
+    return;
+  }
+  if (url.pathname === '/zst') {
+    // Browsers advertise zstd from Chrome 123 on; the bridge must still be able
+    // to read the page and inject the phone layout.
+    const body = zstdCompressSync(Buffer.from(
+      '<!doctype html><html><head><link rel="manifest" href="./manifest.webmanifest"></head><body>zstd</body></html>',
+    ));
+    response.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'content-encoding': 'zstd',
+      'content-length': String(body.length),
+    });
+    response.end(body);
     return;
   }
   response.writeHead(200, { 'content-type': 'text/plain' });
@@ -121,6 +136,15 @@ check('index proxied through the grant', index.status === 200 && html.includes('
 check('manifest link rewritten', html.includes('/__mobile/manifest.webmanifest') && !html.includes('href="./manifest.webmanifest"'));
 check('PWA meta injected', html.includes('apple-mobile-web-app-capable'));
 check('owner cookie stays on the host', !html.includes('secret-value'));
+
+// 5b. A zstd-compressed page is decoded before injection.
+const zst = await fetch(`${base}/zst`, { headers: { cookie } });
+const zstHtml = await zst.text();
+check(
+  'zstd page injected, not passed through',
+  zst.status === 200 && zstHtml.includes('/__mobile/manifest.webmanifest') && zst.headers.get('content-encoding') === null,
+  `encoding=${zst.headers.get('content-encoding')} len=${zstHtml.length}`,
+);
 
 // 6. Other paths are proxied verbatim.
 const echo = await fetch(`${base}/api/ping?x=1`, { headers: { cookie } });
