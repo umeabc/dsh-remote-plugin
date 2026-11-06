@@ -45,6 +45,33 @@
     else openDrawer();
   }
 
+  /** True while DSH's own sidebar is expanded (its toggle offers "collapse"). */
+  function dshExpanded() {
+    var button = document.querySelector('[aria-label="收起侧边栏"], [aria-label="Collapse sidebar"]');
+    return button !== null;
+  }
+
+  /**
+   * Follow DSH instead of guessing from the click target.
+   *
+   * Any sidebar action that is not a session row - the "new session" button,
+   * a project row, a shortcut - closes the sidebar inside the app itself while
+   * our marker kept saying "drawer open": the scrim stayed over the page and
+   * both floating buttons stayed hidden. Reading the real state every time it
+   * can change keeps our layer and the app's in step.
+   */
+  function syncDrawer() {
+    var expanded = dshExpanded();
+    if (expanded === isOpen()) return;
+    if (expanded) {
+      HTML.setAttribute('data-dshm-rail', '1');
+      if (scrim !== null) scrim.style.display = 'block';
+    } else {
+      HTML.removeAttribute('data-dshm-rail');
+      if (scrim !== null) scrim.style.display = 'none';
+    }
+  }
+
   function isAppOrigin() {
     return location.hostname === '127.0.0.1' || location.hostname === 'localhost';
   }
@@ -120,6 +147,7 @@
 
   function mark() {
     if (HTML.getAttribute('data-dshm-mobile') !== '1') HTML.setAttribute('data-dshm-mobile', '1');
+    syncDrawer();
     markSettings();
 
     var sidebar = document.querySelector('[class*="sidebarCol"]');
@@ -175,10 +203,16 @@
   function onWorkspaceClick(event) {
     var target = event.target;
     if (target === null || typeof target.closest !== 'function') return;
-    // Only a real session row dismisses the drawer; expanding a workspace
-    // group keeps it open.
-    if (target.closest('[class*="sessionRow"]') === null) return;
-    window.setTimeout(closeDrawer, 160);
+    // Only a real session row dismisses the drawer immediately; expanding a
+    // workspace group keeps it open. Everything else still has to be watched:
+    // DSH closes the sidebar on its own for other actions (new session, project
+    // switch), so re-read its state right after any click settles.
+    if (target.closest('[class*="sessionRow"]') !== null) {
+      window.setTimeout(closeDrawer, 160);
+    }
+    window.setTimeout(syncDrawer, 60);
+    window.setTimeout(syncDrawer, 220);
+    window.setTimeout(syncDrawer, 600);
   }
 
   function start() {
@@ -196,6 +230,9 @@
       mark();
       if (tries > 20) clearInterval(timer);
     }, 500);
+    // Long-lived pages still change the sidebar without a click (shortcut,
+    // deep link, the app reopening a session), so keep a slow reconciliation.
+    setInterval(syncDrawer, 800);
   }
 
   if (document.body === null) {
