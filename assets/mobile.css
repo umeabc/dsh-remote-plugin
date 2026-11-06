@@ -20,12 +20,12 @@ html[data-dshm-mobile='1'] [data-dshm-frame] {
   grid-template-columns: minmax(0, 1fr) !important;
 }
 
-html[data-dshm-mobile='1'] [data-dshm-frame] > [class*='centerCol'] {
+/* `> *` rather than the conversation's module class: every child belongs in the
+   single track once the template is collapsed (the sidebar is position:fixed,
+   the right bar is hidden, the rest is absolute), and this keeps working when
+   DSH renames its CSS modules. */
+html[data-dshm-mobile='1'] [data-dshm-frame] > * {
   grid-column: 1 !important;
-}
-
-html[data-dshm-mobile='1'] [data-dshm-frame] > [class*='bottomRow'] {
-  grid-column: 1 / -1 !important;
 }
 
 html[data-dshm-mobile='1'] body {
@@ -90,14 +90,19 @@ html[data-dshm-mobile='1'] [data-slot='conversation.header'] header {
   padding-right: 64px !important;
 }
 
-/* Phone-irrelevant desktop affordances in the session header: the file-manager
-   button opens the *desktop's* Explorer, and the background-job counter is
-   already the collapsible strip above the composer. Dropping both hands ~180px
-   back to the session title, which otherwise shrinks to a single character. */
+/* Phone-irrelevant desktop affordances in the session header. The file-manager
+   button opens the *desktop's* Explorer, so it is only an icon button with an
+   aria-label to go by. */
 html[data-dshm-mobile='1'] [data-slot='conversation.header'] button[aria-label*='文件资源管理器'],
-html[data-dshm-mobile='1'] [data-slot='conversation.header'] button[aria-label*='file manager'],
-html[data-dshm-mobile='1'] [data-slot='conversation.header'] button[aria-label*='后台任务'],
-html[data-dshm-mobile='1'] [data-slot='conversation.header'] button[aria-label*='background task'] {
+html[data-dshm-mobile='1'] [data-slot='conversation.header'] button[aria-label*='file manager'] {
+  display: none !important;
+}
+
+/* Every status chip the title cluster grows (running jobs, running subagents,
+   and whatever 0.3 adds next) is a <button>; the agent-preset label beside them
+   is a <span> and stays. Hiding the buttons by structure beats matching each new
+   label, and gives the session title its width back. */
+html[data-dshm-mobile='1'] [data-slot='conversation.header'] [class*='titleCluster'] button {
   display: none !important;
 }
 
