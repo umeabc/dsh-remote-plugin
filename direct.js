@@ -101,7 +101,6 @@ export function directCandidates(config, observedHost) {
       if (v6count >= 2) continue;
       // Global unicast only (2xxx/3xxx); skip ULA (fd00::/8) and link-local.
       if (!/^[23][0-9a-f]{3}:/i.test(raw)) continue;
-      if (/^f[cd]/i.test(raw)) continue;
       found.push(raw);
       seen.add(raw);
       v6count += 1;

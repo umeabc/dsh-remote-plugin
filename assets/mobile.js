@@ -24,14 +24,6 @@
     if (expanded !== open) button.click();
   }
 
-  function openDrawer() {
-    dshToggle(true);
-    window.setTimeout(function () {
-      HTML.setAttribute('data-dshm-rail', '1');
-      if (scrim !== null) scrim.style.display = 'block';
-    }, 40);
-  }
-
   function closeDrawer() {
     HTML.removeAttribute('data-dshm-rail');
     if (scrim !== null) scrim.style.display = 'none';

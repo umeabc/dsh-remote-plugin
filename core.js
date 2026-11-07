@@ -136,10 +136,6 @@ export function writeAsync(socket, buffer) {
   });
 }
 
-export function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export function homeDirectory() {
   return process.env.DSH_HOME ?? join(homedir(), '.dsh');
 }

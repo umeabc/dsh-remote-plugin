@@ -37,7 +37,6 @@ const DEFAULTS = {
   lan: { enabled: true, host: '0.0.0.0', port: 8320, publicHost: '', sessionDays: 30 },
   relay: { enabled: true, url: '' },
   direct: { enabled: true, port: 8330, publicHost: '' },
-  client: { link: '', port: 8331 },
 };
 
 
@@ -330,7 +329,7 @@ export async function apply(ctx, config) {
 
   try {
     await upstream.start();
-    lan = new LanBridge({ ctx, upstream, store, config: settings.lan, assets });
+    lan = new LanBridge({ upstream, store, config: settings.lan, assets });
     await lan.start().catch((error) => {
       warn(`LAN bridge failed to start: ${error.message}`);
       noteFailure('lan', error);

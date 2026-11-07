@@ -12,7 +12,6 @@ import {
   ByteReader,
   FRAME,
   MAX_CHUNK,
-  delay,
   deriveKey,
   encodeFrame,
   frameHeader,
@@ -23,15 +22,6 @@ import {
   warn,
   writeAsync,
 } from './core.js';
-
-/** Destroy a socket without letting a teardown error escape. */
-function closeQuietly(socket) {
-  try {
-    socket?.destroy();
-  } catch {
-    /* already gone */
-  }
-}
 
 function parseRelayUrl(value) {
   if (typeof value !== 'string' || value.trim() === '') return null;
@@ -319,7 +309,6 @@ export class RelayTunnel {
   openChannel(channel, salt) {
     const master = this.key;
     this.channels.set(channel, {
-      salt,
       rxKey: deriveKey(master, salt, 'dshm/c2h'),
       txKey: deriveKey(master, salt, 'dshm/h2c'),
       rxCounter: 0,

@@ -135,8 +135,7 @@ export function lanAddresses() {
 }
 
 export class LanBridge {
-  constructor({ ctx, upstream, store, config, assets }) {
-    this.ctx = ctx;
+  constructor({ upstream, store, config, assets }) {
     this.upstream = upstream;
     this.store = store;
     this.config = config;
