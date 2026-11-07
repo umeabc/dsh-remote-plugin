@@ -18,6 +18,7 @@ import {
   Store,
   Upstream,
   homeDirectory,
+  randomToken,
   log,
   warn,
 } from './core.js';
@@ -69,13 +70,7 @@ function mergeConfig(config) {
 }
 
 function sendJson(response, status, value) {
-  const body = Buffer.from(JSON.stringify(value), 'utf8');
-  response.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'cache-control': 'no-store',
-    'content-length': String(body.length),
-  });
-  response.end(body);
+  sendText(response, status, JSON.stringify(value), 'application/json; charset=utf-8');
 }
 
 function sendText(response, status, text, type = 'text/plain; charset=utf-8') {
@@ -86,6 +81,10 @@ function sendText(response, status, text, type = 'text/plain; charset=utf-8') {
     'content-length': String(body.length),
   });
   response.end(body);
+}
+
+function newRelayCredentials() {
+  return { room: randomBytes(16).toString('hex'), key: randomToken(16) };
 }
 
 export async function apply(ctx, config) {
@@ -289,10 +288,7 @@ export async function apply(ctx, config) {
       sendJson(response, 401, { error: 'unauthorized' });
       return;
     }
-    store.data.relay = {
-      room: randomBytes(16).toString('hex'),
-      key: randomBytes(16).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
-    };
+    store.data.relay = newRelayCredentials();
     void store.save();
     void relay?.stop().then(() => relay?.start());
     sendJson(response, 200, status());
@@ -390,10 +386,7 @@ export async function apply(ctx, config) {
         const action = args?.action ?? 'status';
         if (action === 'revoke') lan?.revokeAll();
         if (action === 'relay-reset') {
-          store.data.relay = {
-            room: randomBytes(16).toString('hex'),
-            key: randomBytes(16).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
-          };
+          store.data.relay = newRelayCredentials();
           await store.save();
           await relay?.stop().catch(() => {});
           relay?.start();

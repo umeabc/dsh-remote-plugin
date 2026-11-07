@@ -367,9 +367,7 @@ export class RelayTunnel {
   send(channel, stream, type, payload) {
     const target = this.channelSockets.get(channel) ?? this.socket;
     if (target === null || target === undefined || target.destroyed) return Promise.resolve(false);
-    const frame = payload === undefined
-      ? encodeFrame(channel, stream, type)
-      : Buffer.concat([frameHeader(channel, stream, type, payload.length), payload]);
+    const frame = encodeFrame(channel, stream, type, payload);
     return writeAsync(target, frame).catch(() => false);
   }
 }
