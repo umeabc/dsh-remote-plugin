@@ -29,14 +29,14 @@ window.__ModuleLoader__.load({ id: 'dsh-mobile-bridge', factory })
 | `--dsw-alias-label-primary-foreground` | `#fff` | `#0f1115` |
 
 老代码 `background: brand-primary` + `color:#fff` 在暗色下就是**白底白字**，对比度 **1.05:1**。
-（见 `docs/shots/01-dark-before.png` 里「保存」整块空白。）
+（见 `docs/shots/01-dark-before.webp` 里「保存」整块空白。）
 
 改法：主按钮用 `button-primary-fill` / `button-primary-hover`（hover）
 + `label-primary-foreground` 作文字色；禁用态用 `button-primary-dimmed` + `label-secondary`；
 次级按钮 hover 用 `interactive-bg-hover`；输入框边线 `border-l2`、聚焦 `button-info-fill`；
 二维码底板保持纯白（扫码需要亮底色），加 `border-l2` 描边。
 
-暗色下主按钮实测 **18.08:1**（`docs/shots/02-dark-after-live.png`），亮色 18.9:1。
+暗色下主按钮实测 **18.08:1**（`docs/shots/02-dark-after-live.webp`），亮色 18.9:1。
 
 ## 3. 其它补齐
 
