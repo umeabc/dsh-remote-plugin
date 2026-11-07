@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased（已合入 main，随下一个版本发布）
+
+代码瘦身，**行为无变化**，对用户不可见：
+
+- 删除确认无引用的死代码：`assets/mobile.js` 的 `openDrawer()`、`relay.js` 的 `closeQuietly()`、
+  `core.js` 的 `delay()` 及其 import、`index.js` 的 `DEFAULTS.client`、`lan.js` 里只赋值不读取的
+  `this.ctx`、`relay.js` 里 channel 状态没读过的 `salt`、`direct.js` 永远不会命中的 `f[cd]` 过滤。
+- 合并三处重复：`sendJson` 复用 `sendText`、`relay.send()` 统一走 `encodeFrame`、
+  room/key 生成抽成 `newRelayCredentials()`（路由不等待、工具等待的既有差异保持不变）。
+- `docs/shots/` 十张截图转成**逐像素相同**的 WebP：479,497 → 155,566 字节（−68%）。
+
+受跟踪内容 722,324 → 397,367 字节。测试：`lan 15/15`、`pool 4/4`、`relay 7 PASS`。
+
+> `index.js` / `core.js` 属宿主半侧，**需重启 DSH** 才生效；`assets/`、`client.js` 刷新手机页面即可。
+
 ## 0.2.5
 
 - 去掉网页侧两颗悬浮按钮：左上角 DSH 自带的「打开侧边栏」已经能开抽屉；「断开连接」改由
